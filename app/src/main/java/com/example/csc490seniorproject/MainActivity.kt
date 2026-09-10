@@ -21,7 +21,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             CSC490SeniorProjectTheme {
                 val navHostController = rememberNavController()
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(modifier = Modifier.fillMaxSize(), topBar = { TopBar(navHostController)}
+                ) { innerPadding ->
                     Nav(navHostController, Modifier.padding(innerPadding))
                 }
             }
