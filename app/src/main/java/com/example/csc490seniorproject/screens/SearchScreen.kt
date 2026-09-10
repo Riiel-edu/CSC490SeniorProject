@@ -5,6 +5,6 @@ import androidx.compose.ui.Modifier
 import com.example.csc490seniorproject.viewmodels.LandingScreenVM
 
 @Composable
-fun SettingsScreen(viewModel: LandingScreenVM, modifier: Modifier) {
+fun SearchScreen(viewModel: LandingScreenVM, modifier: Modifier) {
 
 }
