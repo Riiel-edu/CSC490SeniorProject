@@ -115,7 +115,7 @@ fun LandingScreen(viewModel: LandingScreenVM) {
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                "Create New Song \uD83D\uDCBF",
+                                "Make New Song \uD83D\uDCBF",
                                 fontFamily = fredoka,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
