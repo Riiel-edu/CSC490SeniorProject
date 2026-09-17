@@ -10,14 +10,17 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.csc490seniorproject.screens.LandingScreen
 import com.example.csc490seniorproject.screens.ProfileScreen
+import com.example.csc490seniorproject.screens.SearchScreen
 import com.example.csc490seniorproject.screens.SongScreen
 import com.example.csc490seniorproject.viewmodels.LandingScreenVM
+import com.example.csc490seniorproject.viewmodels.SearchScreenVM
 
 @Composable
 fun Nav(navController: NavHostController, modifier: Modifier) {
     val app = LocalContext.current.applicationContext as Application
 
     val landingScreenVM = viewModel { LandingScreenVM(app) }
+    val searchScreenVM = viewModel { SearchScreenVM(app) }
 
     NavHost(navController=navController, startDestination = "LandingScreen", modifier) {
         composable(route = "LandingScreen") {
@@ -30,7 +33,7 @@ fun Nav(navController: NavHostController, modifier: Modifier) {
             ProfileScreen(landingScreenVM)
         }
         composable(route = "SearchScreen") {
-            ProfileScreen(landingScreenVM)
+            SearchScreen(searchScreenVM)
         }
     }
 }
