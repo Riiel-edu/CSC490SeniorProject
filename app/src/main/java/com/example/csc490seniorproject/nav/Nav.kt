@@ -24,7 +24,7 @@ fun Nav(navController: NavHostController, modifier: Modifier) {
 
     NavHost(navController=navController, startDestination = "LandingScreen", modifier) {
         composable(route = "LandingScreen") {
-            LandingScreen(landingScreenVM)
+            LandingScreen(landingScreenVM, navController)
         }
         composable(route = "SongScreen") {
             SongScreen(landingScreenVM)
@@ -33,7 +33,10 @@ fun Nav(navController: NavHostController, modifier: Modifier) {
             ProfileScreen(landingScreenVM)
         }
         composable(route = "SearchScreen") {
-            SearchScreen(searchScreenVM)
+            SearchScreen(searchScreenVM, navController)
+        }
+        composable(route = "SongScreen") {
+            SongScreen(landingScreenVM)
         }
     }
 }

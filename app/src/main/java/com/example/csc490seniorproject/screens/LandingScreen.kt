@@ -51,11 +51,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import com.example.csc490seniorproject.R
 import com.example.csc490seniorproject.viewmodels.LandingScreenVM
 
 @Composable
-fun LandingScreen(viewModel: LandingScreenVM) {
+fun LandingScreen(viewModel: LandingScreenVM, navController: NavController) {
 
     val fredoka = FontFamily(Font(R.font.fredoka_medium, FontWeight.Normal))
 
@@ -122,7 +123,9 @@ fun LandingScreen(viewModel: LandingScreenVM) {
                             )
                         }
                         Button(
-                            onClick = { },
+                            onClick = {
+                                navController.navigate("SearchScreen")
+                            },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF5d36eb),
                                 contentColor = Color.White
@@ -253,7 +256,9 @@ fun LandingScreen(viewModel: LandingScreenVM) {
                             )
                         }
                         Button(
-                            onClick = { },
+                            onClick = {
+                                navController.navigate("SongScreen")
+                            },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF5d36eb),
                                 contentColor = Color.White

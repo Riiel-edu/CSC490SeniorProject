@@ -42,12 +42,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import com.example.csc490seniorproject.R
 import com.example.csc490seniorproject.viewmodels.LandingScreenVM
 import com.example.csc490seniorproject.viewmodels.SearchScreenVM
 
 @Composable
-fun SearchScreen(viewModel: SearchScreenVM) {
+fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
 
     val songsList = viewModel.songsList
 
@@ -238,7 +239,9 @@ fun SearchScreen(viewModel: SearchScreenVM) {
                                 )
                             }
                             Button(
-                                onClick = { },
+                                onClick = {
+                                    navController.navigate("SongScreen")
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF5d36eb),
                                     contentColor = Color.White
