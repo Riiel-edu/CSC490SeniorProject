@@ -14,6 +14,7 @@ import com.example.csc490seniorproject.screens.SearchScreen
 import com.example.csc490seniorproject.screens.SongScreen
 import com.example.csc490seniorproject.viewmodels.LandingScreenVM
 import com.example.csc490seniorproject.viewmodels.SearchScreenVM
+import com.example.csc490seniorproject.screens.LoginScreen
 
 @Composable
 fun Nav(navController: NavHostController, modifier: Modifier) {
@@ -22,16 +23,34 @@ fun Nav(navController: NavHostController, modifier: Modifier) {
     val landingScreenVM = viewModel { LandingScreenVM(app) }
     val searchScreenVM = viewModel { SearchScreenVM(app) }
 
-    NavHost(navController=navController, startDestination = "LandingScreen", modifier) {
+    NavHost(
+        navController = navController,
+        startDestination = "LoginScreen",
+        modifier = modifier
+    ) {
+        composable(route = "LoginScreen") {
+            LoginScreen(onLoginSuccess = {
+                    navController.navigate("LandingScreen") {
+                        popUpTo("LoginScreen") {
+                            inclusive = true
+                        }
+                    }
+                }
+            )
+        }
+
         composable(route = "LandingScreen") {
             LandingScreen(landingScreenVM)
         }
+
         composable(route = "SongScreen") {
             SongScreen(landingScreenVM)
         }
+
         composable(route = "ProfileScreen") {
             ProfileScreen(landingScreenVM)
         }
+
         composable(route = "SearchScreen") {
             SearchScreen(searchScreenVM)
         }
