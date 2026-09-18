@@ -69,7 +69,7 @@ fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(songsList) { currentItem ->
-
+                //Song block start
                 Surface(
                     color = Color(0xFFbfb1fa),
                     modifier = Modifier.fillMaxWidth(),
@@ -259,7 +259,7 @@ fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
                             }
                         }
                     }
-                }
+                } // Song block end
             }
         }
     }
