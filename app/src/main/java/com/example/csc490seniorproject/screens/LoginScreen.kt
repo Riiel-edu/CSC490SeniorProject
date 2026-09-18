@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun LoginScreen(onLoginSuccess: () -> Unit) {
@@ -146,7 +147,14 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 if (email.isBlank() || password.isBlank()) {
                     errorMessage = "Please enter your email and password."
                 } else {
-                    onLoginSuccess()
+                    FirebaseAuth.getInstance()
+                        .signInWithEmailAndPassword(email,password)
+                        .addOnSuccessListener{
+                            onLoginSuccess()
+                        }
+                        .addOnFailureListener { e->
+                            errorMessage = e.localizedMessage ?:"Login failed please try again"
+                        }
                 }
             },
             modifier = Modifier
