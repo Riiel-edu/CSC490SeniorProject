@@ -40,7 +40,7 @@ import com.example.csc490seniorproject.R
 import com.example.csc490seniorproject.viewmodels.LandingScreenVM
 
 @Composable
-fun ProfileScreen(viewModel: LandingScreenVM) {
+fun ProfileScreen(viewModel: LandingScreenVM, username: String) {
     val fredoka = FontFamily(Font(R.font.fredoka_medium, FontWeight.Normal))
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
@@ -79,7 +79,7 @@ fun ProfileScreen(viewModel: LandingScreenVM) {
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Username", fontFamily = fredoka, fontSize = 24.sp)
+                Text(text = username, fontFamily = fredoka, fontSize = 24.sp)
 
                 Button(
                     onClick = {

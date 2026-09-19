@@ -56,7 +56,7 @@ import com.example.csc490seniorproject.R
 import com.example.csc490seniorproject.viewmodels.LandingScreenVM
 
 @Composable
-fun LandingScreen(viewModel: LandingScreenVM, navController: NavController) {
+fun LandingScreen(viewModel: LandingScreenVM, navController: NavController, username: String) {
 
     val fredoka = FontFamily(Font(R.font.fredoka_medium, FontWeight.Normal))
 
@@ -70,7 +70,7 @@ fun LandingScreen(viewModel: LandingScreenVM, navController: NavController) {
 
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    "♫ Welcome Back, Username! ♫",
+                    "♫ Welcome Back, $username! ♫",
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
                     fontFamily = fredoka, fontSize = 28.sp,
