@@ -52,7 +52,7 @@ import com.example.csc490seniorproject.viewmodels.ProfileScreenVM
 
 private enum class ProfileTab { SONGS, FRIENDS, CHATS }
 @Composable
-fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController) {
+fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, username: String) {
     val fredoka = FontFamily(Font(R.font.fredoka_medium, FontWeight.Normal))
     val songsList = viewModel.songsList
     val friendsList = viewModel.friendsList
@@ -96,7 +96,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController) {
                         .padding(vertical = 4.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Username", fontFamily = fredoka, fontSize = 24.sp)
+                    Text(text = username, fontFamily = fredoka, fontSize = 24.sp)
 
                     Button(
                         onClick = {

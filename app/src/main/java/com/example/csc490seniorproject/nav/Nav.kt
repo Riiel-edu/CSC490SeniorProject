@@ -98,7 +98,8 @@ fun Nav(navController: NavHostController,
         composable(route = "ProfileScreen") {
             ProfileScreen(
                 viewModel = profileScreenVM,
-                navController = navController
+                navController = navController,
+                username = currentUsername
             )
         }
 
