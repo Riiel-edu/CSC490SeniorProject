@@ -11,7 +11,6 @@ class User (
     @ColumnInfo var DoB: String,
     @ColumnInfo var email: String,
     @ColumnInfo var songs: List<Song>,
-    @ColumnInfo var favorites: List<Song>,
     @ColumnInfo var friends: List<User>
     ){
 }

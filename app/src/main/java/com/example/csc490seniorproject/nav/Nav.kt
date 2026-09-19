@@ -20,10 +20,12 @@ import com.example.csc490seniorproject.screens.LoginScreen
 import com.example.csc490seniorproject.screens.RegisterScreen
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import com.example.csc490seniorproject.viewmodels.ProfileScreenVM
 
 @Composable
-fun Nav(navController: NavHostController, modifier: Modifier) {
-
+fun Nav(navController: NavHostController,
+        modifier: Modifier
+) {
     val app = LocalContext.current.applicationContext as Application
 
     val landingScreenVM = viewModel {
@@ -32,6 +34,10 @@ fun Nav(navController: NavHostController, modifier: Modifier) {
 
     val searchScreenVM = viewModel {
         SearchScreenVM(app)
+    }
+
+    val profileScreenVM = viewModel {
+        ProfileScreenVM(app)
     }
 
     var currentUsername by rememberSaveable {
@@ -51,7 +57,6 @@ fun Nav(navController: NavHostController, modifier: Modifier) {
                         popUpTo("LoginScreen") {
                             inclusive = true
                         }
-
                         launchSingleTop = true
                     }
                 },
@@ -63,14 +68,12 @@ fun Nav(navController: NavHostController, modifier: Modifier) {
 
         composable(route = "RegisterScreen") {
             RegisterScreen(
-                onRegistrationSuccess = { username ->
-                    currentUsername = username
+                onRegistrationSuccess = { username -> currentUsername = username
 
                     navController.navigate("LandingScreen") {
                         popUpTo("LoginScreen") {
                             inclusive = true
                         }
-
                         launchSingleTop = true
                     }
                 },
@@ -94,8 +97,8 @@ fun Nav(navController: NavHostController, modifier: Modifier) {
 
         composable(route = "ProfileScreen") {
             ProfileScreen(
-                viewModel = landingScreenVM,
-                username = currentUsername
+                viewModel = profileScreenVM,
+                navController = navController
             )
         }
 
@@ -106,5 +109,4 @@ fun Nav(navController: NavHostController, modifier: Modifier) {
             )
         }
     }
-
 }
