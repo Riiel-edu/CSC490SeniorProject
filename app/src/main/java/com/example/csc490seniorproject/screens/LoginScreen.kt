@@ -34,10 +34,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.auth.FirebaseAuth
 
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit) {
+fun LoginScreen( onLoginSuccess: (String) -> Unit, onRegisterClick: () -> Unit) {
+
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -78,7 +78,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
-            value = email, onValueChange = {
+            value = email,
+            onValueChange = {
                 email = it
                 errorMessage = ""
             },
@@ -92,40 +93,45 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         Spacer(modifier = Modifier.height(14.dp))
 
         OutlinedTextField(
-            value = password, onValueChange = {
+            value = password,
+            onValueChange = {
                 password = it
                 errorMessage = ""
             },
             label = { Text("Password") },
             singleLine = true,
-            visualTransformation =
-                if (passwordVisible) {
-                    VisualTransformation.None
-                } else {
-                    PasswordVisualTransformation()
-                },
+            visualTransformation = if (passwordVisible) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            },
             trailingIcon = {
                 IconButton(
-                    onClick = { passwordVisible = !passwordVisible }
+                    onClick = {
+                        passwordVisible = !passwordVisible
+                    }
                 ) {
                     Icon(
-                        imageVector =
-                            if (passwordVisible) {
-                                Icons.Default.VisibilityOff
-                            } else {
-                                Icons.Default.Visibility
-                            },
-                        contentDescription = "Show or hide password"
+                        imageVector = if (passwordVisible) {
+                            Icons.Default.VisibilityOff
+                        } else {
+                            Icons.Default.Visibility
+                        },
+                        contentDescription = if (passwordVisible) {
+                            "Hide password"
+                        } else {
+                            "Show password"
+                        }
                     )
                 }
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp)
-        )
+            shape = RoundedCornerShape(14.dp))
 
         if (errorMessage.isNotEmpty()) {
             Spacer(modifier = Modifier.height(10.dp))
+
             Text(
                 text = errorMessage,
                 color = Color.Red,
@@ -133,7 +139,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             )
         }
 
-        TextButton(onClick = { /* Add password reset later */ }) {
+        TextButton(
+            onClick = {
+                // Password reset can be added later.
+            }
+        ) {
             Text(
                 text = "Forgot password?",
                 color = purple
@@ -144,25 +154,24 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
         Button(
             onClick = {
-                if (email.isBlank() || password.isBlank()) {
-                    errorMessage = "Please enter your email and password."
-                } else {
-                    FirebaseAuth.getInstance()
-                        .signInWithEmailAndPassword(email,password)
-                        .addOnSuccessListener{
-                            onLoginSuccess()
-                        }
-                        .addOnFailureListener { e->
-                            errorMessage = e.localizedMessage ?:"Login failed please try again"
-                        }
+                when {
+                    email.isBlank() || password.isBlank() -> {
+                        errorMessage = "Please enter your email and password."
+                    }
+
+                    !email.contains("@") -> {
+                        errorMessage = "Please enter a valid email."
+                    }
+
+                    else -> {
+                        val username = email.trim().substringBefore("@")
+
+                        onLoginSuccess(username)
+                    }
                 }
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = purple
-            ),
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = purple),
             shape = RoundedCornerShape(14.dp)
         ) {
             Text(
@@ -174,11 +183,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        TextButton(onClick = { /* Add registration page later */ }) {
-            Text(
-                text = "Don’t have an account? Sign up",
-                color = purple
-            )
+        TextButton(onClick = onRegisterClick) {
+            Text(text = "Don’t have an account? Sign up", color = purple)
         }
     }
 
