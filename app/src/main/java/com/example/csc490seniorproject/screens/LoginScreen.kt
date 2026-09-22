@@ -34,6 +34,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.csc490seniorproject.data.getUserProfile
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun LoginScreen( onLoginSuccess: (String) -> Unit, onRegisterClick: () -> Unit) {
@@ -166,7 +168,21 @@ fun LoginScreen( onLoginSuccess: (String) -> Unit, onRegisterClick: () -> Unit) 
                     else -> {
                         val username = email.trim().substringBefore("@")
 
-                        onLoginSuccess(username)
+                        FirebaseAuth.getInstance()
+                            .signInWithEmailAndPassword(email, password)
+                            .addOnSuccessListener { authResult ->
+                                val uid = authResult.user!!.uid
+                                getUserProfile(
+                                    uid = uid,
+                                    onSuccess = { profile -> onLoginSuccess(profile.username) },
+                                    onFailure = { e ->
+                                        errorMessage = "Logged in, but couldn't load profile: ${e.localizedMessage}"
+                                    }
+                                )
+                            }
+                            .addOnFailureListener { e ->
+                                errorMessage = e.localizedMessage ?: "Login failed. Please try again."
+                            }
                     }
                 }
             },

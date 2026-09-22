@@ -36,6 +36,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
+import com.example.csc490seniorproject.data.createUserProfile
 
 @Composable
 fun RegisterScreen ( onRegistrationSuccess: (String) -> Unit, onLoginClick: () -> Unit) {
@@ -193,7 +195,22 @@ fun RegisterScreen ( onRegistrationSuccess: (String) -> Unit, onLoginClick: () -
                     }
 
                     else -> {
-                        onRegistrationSuccess(username.trim())
+                        FirebaseAuth.getInstance()
+                            .createUserWithEmailAndPassword(email, password)
+                            .addOnSuccessListener { authResult ->
+                                val user = authResult.user!!
+                                createUserProfile(
+                                    firebaseUser = user,
+                                    username = username,
+                                    onSuccess = {onRegistrationSuccess(username)},
+                                    onFailure = { e ->
+                                        errorMessage= "Account created, but profile setup failed: ${e.localizedMessage}"
+                                    }
+                                )
+                            }
+                            .addOnFailureListener { e ->
+                                errorMessage = e.localizedMessage ?: "Registration failed. Please try again."
+                            }
                     }
                 }
             },

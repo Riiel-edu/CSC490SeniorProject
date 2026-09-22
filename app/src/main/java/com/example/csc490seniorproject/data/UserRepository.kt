@@ -1,4 +1,4 @@
-package data
+package com.example.csc490seniorproject.data
 
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
@@ -11,6 +11,7 @@ val profilePhotoURL: String ="",
 val createdAt: Long = System.currentTimeMillis(),
 val followerCount: Int =0,
 val followingCount: Int=0
+
 )
 
 fun createUserProfile(
@@ -30,5 +31,24 @@ fun createUserProfile(
         .set(profile)
         .addOnSuccessListener { onSuccess() }
         .addOnFailureListener { e-> onFailure(e) }
+}
+fun getUserProfile(
+    uid: String,
+    onSuccess: (UserProfile) -> Unit,
+    onFailure: (Exception) -> Unit
+) {
+    FirebaseFirestore.getInstance()
+        .collection("users")
+        .document(uid)
+        .get()
+        .addOnSuccessListener { snapshot ->
+            val profile = snapshot.toObject(UserProfile::class.java)
+            if (profile != null) {
+                onSuccess(profile)
+            } else {
+                onFailure(Exception("Profile not found"))
+            }
+        }
+        .addOnFailureListener { e -> onFailure(e) }
 }
 
