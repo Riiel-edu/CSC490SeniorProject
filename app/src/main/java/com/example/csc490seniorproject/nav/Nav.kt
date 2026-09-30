@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.csc490seniorproject.screens.editor.EditorScreen
 import com.example.csc490seniorproject.screens.LandingScreen
 import com.example.csc490seniorproject.screens.ProfileScreen
 import com.example.csc490seniorproject.screens.SearchScreen
@@ -15,6 +16,7 @@ import com.example.csc490seniorproject.screens.SongScreen
 import com.example.csc490seniorproject.viewmodels.LandingScreenVM
 import com.example.csc490seniorproject.viewmodels.SearchScreenVM
 import com.example.csc490seniorproject.screens.LoginScreen
+import com.example.csc490seniorproject.viewmodels.EditorScreenVM
 import com.example.csc490seniorproject.viewmodels.ProfileScreenVM
 
 @Composable
@@ -24,6 +26,7 @@ fun Nav(navController: NavHostController, modifier: Modifier) {
     val landingScreenVM = viewModel { LandingScreenVM(app) }
     val searchScreenVM = viewModel { SearchScreenVM(app) }
     val profileScreenVM = viewModel { ProfileScreenVM(app) }
+    val editorScreenVM = viewModel { EditorScreenVM(app) }
 
     NavHost(
         navController = navController,
@@ -40,7 +43,6 @@ fun Nav(navController: NavHostController, modifier: Modifier) {
                 }
             )
         }
-
         composable(route = "LandingScreen") {
             LandingScreen(landingScreenVM, navController)
         }
@@ -58,6 +60,9 @@ fun Nav(navController: NavHostController, modifier: Modifier) {
         }
         composable(route = "SongScreen") {
             SongScreen(landingScreenVM)
+        }
+        composable("EditorScreen") {
+            EditorScreen(viewModel = editorScreenVM, modifier = Modifier)
         }
     }
 }
