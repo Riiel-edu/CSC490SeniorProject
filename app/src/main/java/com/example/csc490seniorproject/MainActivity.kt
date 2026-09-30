@@ -39,12 +39,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
             CSC490SeniorProjectTheme {
-                var selectedItemIndex by rememberSaveable { mutableStateOf(0) }
+                var selectedItemIndex by rememberSaveable {
+                    mutableStateOf(0) }
                 val navHostController = rememberNavController()
                 val navBackStackEntry by navHostController.currentBackStackEntryAsState()
+
                 val currentDestination = navBackStackEntry?.destination
+                val currentRoute = currentDestination?.route
+
+                val showNavigationBars =
+                    currentRoute != null && currentRoute != "LoginScreen" && currentRoute != "RegisterScreen"
 
                 val navItemsList = listOf(
                     NavItem(
@@ -52,52 +59,83 @@ class MainActivity : ComponentActivity() {
                         iconSelected = Icons.Filled.Home,
                         iconUnselected = Icons.Outlined.Home,
                         route = "LandingScreen"
-                    ),
-                    NavItem(title="Search",
+                    ), NavItem(
+                        title = "Search",
                         iconSelected = Icons.Filled.Search,
                         iconUnselected = Icons.Outlined.Search,
-                        route="SearchScreen"
-                    ),
-                    NavItem(title="Create",
+                        route = "SearchScreen"
+                    ), NavItem(
+                        title = "Create",
                         iconSelected = Icons.Filled.Add,
                         iconUnselected = Icons.Outlined.Add,
-                        route="EditorScreen"
-                    ),
-                    NavItem(title="Profile",
+                        route = "EditorScreen"
+                    ), NavItem(
+                        title = "Profile",
                         iconSelected = Icons.Filled.Person,
                         iconUnselected = Icons.Outlined.PersonOutline,
-                        route="ProfileScreen"
+                        route = "ProfileScreen"
                     )
                 )
 
-                Scaffold(modifier = Modifier.fillMaxSize(),
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+
+                    topBar = {
+                        if (showNavigationBars) {
+                            TopBar(navHostController)
+                        }
+                    },
                     bottomBar = {
-                        NavigationBar {
-                            navItemsList.forEachIndexed { index, item ->
-                                NavigationBarItem(
-                                    selected = currentDestination?.hierarchy?.any { it.route.equals(item.route) } == true,
-                                    onClick = {
-                                        selectedItemIndex = index
-                                        navHostController.navigate(item.route) {
-                                            launchSingleTop = true
-                                            restoreState = true
-                                            popUpTo(navHostController.graph.findStartDestination().id) { saveState = true }
+                        if (showNavigationBars) {
+                            NavigationBar {
+                                navItemsList.forEachIndexed { index, item ->
+                                    NavigationBarItem(
+                                        selected = currentDestination.hierarchy.any {
+                                            it.route == item.route
+                                        },
+                                        onClick = {
+                                            selectedItemIndex = index
+
+                                            navHostController.navigate(item.route) {
+                                                launchSingleTop = true
+                                                restoreState = true
+
+                                                popUpTo(
+                                                    navHostController.graph.findStartDestination().id
+                                                ) {
+                                                    saveState = true
+                                                }
+                                            }
+                                        },
+
+                                        label = {
+                                            Text(text = item.title)
+                                        },
+
+                                        icon = {
+                                            Icon(
+                                                contentDescription = item.title,
+                                                imageVector = if (index == selectedItemIndex) {
+                                                    item.iconSelected
+                                                } else {
+                                                    item.iconUnselected
+                                                }
+                                            )
+
                                         }
-                                    },
-                                    label = { Text(text = item.title) },
-                                    icon = { Icon(contentDescription = item.title,
-                                        imageVector = if (index == selectedItemIndex) item.iconSelected
-                                        else item.iconUnselected
                                     )
-                                    }
-                                )
+                                }
                             }
                         }
-                    }, topBar = { TopBar(navHostController) }
-                ) { innerPadding ->
-                    Nav(navHostController, Modifier.padding(innerPadding))
+                    }
+                )
+                { innerPadding ->
+                    Nav(
+                    navController = navHostController, modifier = Modifier.padding(innerPadding)
+                    )
                 }
             }
         }
+
     }
 }
