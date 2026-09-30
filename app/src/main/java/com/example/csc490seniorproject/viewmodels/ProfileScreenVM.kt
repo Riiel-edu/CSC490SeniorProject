@@ -15,8 +15,8 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
 
     init {
         viewModelScope.launch {
-            songsList.add(Song(0, "Placeholder", 2.9))
-            songsList.add(Song(0, "Placeholder2", 4.9))
+            songsList.add(Song())
+            songsList.add(Song())
             friendsList.add(User("Username", "Fname", "Lname", false,
                 "1/1/2020", "email@mmm", songsList, friendsList))
             friendsList.add(User("Username2", "Fname", "Lname", false,
