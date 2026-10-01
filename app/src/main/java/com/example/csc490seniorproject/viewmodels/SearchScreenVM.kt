@@ -12,8 +12,8 @@ class SearchScreenVM(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            songsList.add(Song(0, "Placeholder", 2.9))
-            songsList.add(Song(0, "Placeholder2", 4.9))
+            songsList.add(Song())
+            songsList.add(Song())
         }
     }
 
