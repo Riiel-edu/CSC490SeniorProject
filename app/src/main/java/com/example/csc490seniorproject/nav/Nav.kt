@@ -20,6 +20,7 @@ import com.example.csc490seniorproject.screens.LoginScreen
 import com.example.csc490seniorproject.screens.RegisterScreen
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import com.example.csc490seniorproject.screens.SettingsScreen
 import com.example.csc490seniorproject.viewmodels.ProfileScreenVM
 
 @Composable
@@ -108,6 +109,13 @@ fun Nav(navController: NavHostController,
                 viewModel = searchScreenVM,
                 navController = navController
             )
+        }
+        composable("SettingsScreen") {
+            SettingsScreen(
+                viewModel = landingScreenVM,
+                onProfileClick = { navController.navigate("ProfileScreen") }
+            )
+
         }
     }
 }
