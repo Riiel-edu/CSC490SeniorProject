@@ -25,6 +25,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +54,10 @@ import com.example.csc490seniorproject.viewmodels.ProfileScreenVM
 private enum class ProfileTab { SONGS, FRIENDS, CHATS }
 @Composable
 fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, username: String) {
+    LaunchedEffect(username) {
+        viewModel.getFriends(username)
+        viewModel.getSongs(username)
+    }
     val fredoka = FontFamily(Font(R.font.fredoka_medium, FontWeight.Normal))
     val songsList = viewModel.songsList
     val friendsList = viewModel.friendsList
