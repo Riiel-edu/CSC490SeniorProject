@@ -51,7 +51,11 @@ class MainActivity : ComponentActivity() {
                 val currentRoute = currentDestination?.route
 
                 val showNavigationBars =
-                    currentRoute != null && currentRoute != "LoginScreen" && currentRoute != "RegisterScreen"
+                    currentRoute != null &&
+                            currentRoute != "SplashScreen" &&
+                            currentRoute != "LoginScreen" &&
+                            currentRoute != "RegisterScreen"
+
 
                 val navItemsList = listOf(
                     NavItem(
