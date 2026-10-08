@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 
 import androidx.compose.runtime.setValue
 import com.example.csc490seniorproject.screens.SettingsScreen
+import com.example.csc490seniorproject.screens.SplashScreen
 
 import com.example.csc490seniorproject.viewmodels.ProfileScreenVM
 
@@ -43,9 +44,21 @@ fun Nav(navController: NavHostController,
 
     NavHost(
         navController = navController,
-        startDestination = "LoginScreen",
+        startDestination = "SplashScreen",
         modifier = modifier
     ) {
+        composable(route = "SplashScreen") {
+            SplashScreen(
+                onSplashFinished = {
+                    navController.navigate("LoginScreen") {
+                        popUpTo("SplashScreen") {
+                            inclusive = true
+                        }
+                    }
+                }
+            )
+        }
+
         composable(route = "LoginScreen") {
             LoginScreen(
                 onLoginSuccess = { username ->
