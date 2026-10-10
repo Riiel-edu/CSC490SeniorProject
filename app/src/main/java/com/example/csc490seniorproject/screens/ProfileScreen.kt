@@ -241,7 +241,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            "Chats",
+                            "Messages",
                             fontFamily = fredoka,
                             fontSize = 13.sp,
                             color = Color.White,
@@ -258,7 +258,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                 when (selectedTab) {
                     ProfileTab.SONGS -> "Songs"
                     ProfileTab.FRIENDS -> "Friends"
-                    ProfileTab.CHATS -> "Chats"
+                    ProfileTab.CHATS -> "Messages"
                 },
                 fontFamily = fredoka,
                 fontSize = 20.sp
@@ -568,14 +568,8 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                 }
             }
             ProfileTab.CHATS -> {
-                items(messageList) { currentItem ->
-                    Text(
-                        currentItem,
-                        fontFamily = fredoka,
-                        fontSize = 14.sp,
-                        color = Color(0xFF444444),
-                        modifier = Modifier.padding(12.dp)
-                    )
+                item {
+                    ChatBox(friendUsernames = friendsList.map { it.username })
                 }
             }
         }
