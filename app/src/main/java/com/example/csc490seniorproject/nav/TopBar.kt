@@ -59,7 +59,6 @@ fun TopBar(navController: NavHostController) {
                     contentDescription = "Settings"
                 )
             }
-            navController.navigate("SettingsScreen")
         }
     )
 }
