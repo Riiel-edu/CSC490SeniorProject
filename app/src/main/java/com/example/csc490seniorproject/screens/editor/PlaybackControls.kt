@@ -1,4 +1,4 @@
-package com.example.csc490seniorproject.screens.editor
+package com.example.csc490seniorproject.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -66,8 +66,9 @@ fun RestartButton(onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(44.dp)
-            .background(Color(0xFFbfb1fa), CircleShape)
+            .size(40.dp)
+            .background(Color(0xFF5d36eb), CircleShape)
+            .padding(5.dp)
     ) {
         Icon(
             imageVector = Icons.Filled.Replay,
@@ -82,7 +83,7 @@ fun PlayStopButton(isPlaying: Boolean, onPlay: () -> Unit, onStop: () -> Unit) {
     Button(
         onClick = { if (isPlaying) onStop() else onPlay() },
         colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF5d36eb),
+            containerColor = if(isPlaying) Color(0xFFFF0000) else Color(0xFF00D93D),
             contentColor = Color.White
         ),
         shape = RoundedCornerShape(10.dp)
@@ -100,15 +101,18 @@ fun PlayStopButton(isPlaying: Boolean, onPlay: () -> Unit, onStop: () -> Unit) {
 }
 
 private val NOTE_LENGTH_OPTIONS = listOf(
-    "Short" to 1,
-    "Medium" to 2,
-    "Long" to 4,
-    "Whole" to 8
+    "1/8 ♪" to 1,
+    "1/4 ♩" to 2,
+    "1/2 \uD834\uDD5E" to 4,
+    "Whole \uD834\uDD5D" to 8
 )
 
 @Composable
 fun NoteLengthSelector(selectedSteps: Int, onSelect: (Int) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         NOTE_LENGTH_OPTIONS.forEach { (label, steps) ->
             val isSelected = steps == selectedSteps
             Box(
@@ -125,7 +129,9 @@ fun NoteLengthSelector(selectedSteps: Int, onSelect: (Int) -> Unit) {
                     text = label,
                     fontFamily = fredoka,
                     fontSize = 12.sp,
-                    color = Color.White
+                    color = Color.White,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }
@@ -178,7 +184,7 @@ fun TempoControl(bpm: Int, onChangeBpm: (Int) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         IconButton(
             onClick = { onChangeBpm(bpm - 5) },
-            modifier = Modifier.size(32.dp).background(Color(0xFFbfb1fa), CircleShape)
+            modifier = Modifier.size(32.dp).background(Color(0xFF5d36eb), CircleShape).padding(2.dp)
         ) {
             Text(text = "–", fontFamily = fredoka, color = Color.White, fontSize = 18.sp)
         }
@@ -192,7 +198,7 @@ fun TempoControl(bpm: Int, onChangeBpm: (Int) -> Unit) {
         )
         IconButton(
             onClick = { onChangeBpm(bpm + 5) },
-            modifier = Modifier.size(32.dp).background(Color(0xFFbfb1fa), CircleShape)
+            modifier = Modifier.size(32.dp).background(Color(0xFF5d36eb), CircleShape).padding(2.dp)
         ) {
             Text(text = "+", fontFamily = fredoka, color = Color.White, fontSize = 18.sp)
         }
@@ -204,13 +210,11 @@ fun EditorToolbar(
     isPlaying: Boolean,
     bpm: Int,
     totalBars: Int,
-    noteLengthSteps: Int,
     onRestart: () -> Unit,
     onPlay: () -> Unit,
     onStop: () -> Unit,
     onBpmChange: (Int) -> Unit,
-    onJumpToBar: (Int) -> Unit,
-    onNoteLengthSelect: (Int) -> Unit
+    onJumpToBar: (Int) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -221,6 +225,5 @@ fun EditorToolbar(
         PlayStopButton(isPlaying = isPlaying, onPlay = onPlay, onStop = onStop)
         TempoControl(bpm = bpm, onChangeBpm = onBpmChange)
         BarJumpField(totalBars = totalBars, onJumpToBar = onJumpToBar)
-        NoteLengthSelector(selectedSteps = noteLengthSteps, onSelect = onNoteLengthSelect)
     }
 }
