@@ -277,7 +277,7 @@ private fun OctaveStepper(octave: Int, onOctaveChange: (Int) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         IconButton(
             onClick = { if (octave > MIN_OCTAVE) onOctaveChange(octave - 1) },
-            modifier = Modifier.size(28.dp).background(Color(0xFFbfb1fa), CircleShape)
+            modifier = Modifier.size(28.dp).background(Color(0xFF5d36eb), CircleShape).padding(2.dp)
         ) {
             Text(text = "–", fontFamily = fredoka, color = Color.White, fontSize = 16.sp)
         }
@@ -291,7 +291,7 @@ private fun OctaveStepper(octave: Int, onOctaveChange: (Int) -> Unit) {
         )
         IconButton(
             onClick = { if (octave < MAX_OCTAVE) onOctaveChange(octave + 1) },
-            modifier = Modifier.size(28.dp).background(Color(0xFFbfb1fa), CircleShape)
+            modifier = Modifier.size(28.dp).background(Color(0xFF5d36eb), CircleShape).padding(2.dp)
         ) {
             Text(text = "+", fontFamily = fredoka, color = Color.White, fontSize = 16.sp)
         }
