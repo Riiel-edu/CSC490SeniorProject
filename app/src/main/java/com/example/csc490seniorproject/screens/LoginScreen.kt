@@ -35,12 +35,13 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.csc490seniorproject.data.getUserProfile
+import com.example.csc490seniorproject.data.getEmailForUsername
 import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun LoginScreen( onLoginSuccess: (String) -> Unit, onRegisterClick: () -> Unit) {
 
-    var email by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
@@ -80,14 +81,14 @@ fun LoginScreen( onLoginSuccess: (String) -> Unit, onRegisterClick: () -> Unit) 
         Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
-            value = email,
+            value = username,
             onValueChange = {
-                email = it
+                username = it
                 errorMessage = ""
             },
-            label = { Text("Email") },
+            label = { Text("Username") },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp)
         )
@@ -156,34 +157,31 @@ fun LoginScreen( onLoginSuccess: (String) -> Unit, onRegisterClick: () -> Unit) 
 
         Button(
             onClick = {
-                when {
-                    email.isBlank() || password.isBlank() -> {
-                        errorMessage = "Please enter your email and password."
-                    }
-
-                    !email.contains("@") -> {
-                        errorMessage = "Please enter a valid email."
-                    }
-
-                    else -> {
-                        val username = email.trim().substringBefore("@")
-
-                        FirebaseAuth.getInstance()
-                            .signInWithEmailAndPassword(email, password)
-                            .addOnSuccessListener { authResult ->
-                                val uid = authResult.user!!.uid
-                                getUserProfile(
-                                    uid = uid,
-                                    onSuccess = { profile -> onLoginSuccess(profile.username) },
-                                    onFailure = { e ->
-                                        errorMessage = "Logged in, but couldn't load profile: ${e.localizedMessage}"
-                                    }
-                                )
-                            }
-                            .addOnFailureListener { e ->
-                                errorMessage = e.localizedMessage ?: "Login failed. Please try again."
-                            }
-                    }
+                if (username.isBlank() || password.isBlank()) {
+                    errorMessage = "Please enter your username and password."
+                } else {
+                    getEmailForUsername(
+                        username = username,
+                        onSuccess = { resolvedEmail ->
+                            FirebaseAuth.getInstance()
+                                .signInWithEmailAndPassword(resolvedEmail, password)
+                                .addOnSuccessListener { authResult ->
+                                    val uid = authResult.user!!.uid
+                                    getUserProfile(
+                                        uid = uid,
+                                        onSuccess = { profile -> onLoginSuccess(profile.username) },
+                                        onFailure = { e ->
+                                            errorMessage = "Logged in, but couldn't load profile: ${e.localizedMessage}"
+                                        }
+                                    )
+                                }
+                                .addOnFailureListener { e ->
+                                    errorMessage = "Your username or password is incorrect."
+                                }
+                        },
+                        onNotFound = { errorMessage = "No account found with that username." },
+                        onFailure = { e -> errorMessage = e.localizedMessage ?: "Something went wrong. Please try again." }
+                    )
                 }
             },
             modifier = Modifier.fillMaxWidth().height(54.dp),
