@@ -31,7 +31,6 @@ import com.example.csc490seniorproject.screens.GameScreen
 import com.example.csc490seniorproject.screens.SettingsScreen
 import com.example.csc490seniorproject.viewmodels.BeatmapEditorVM
 import com.example.csc490seniorproject.viewmodels.GameVM
-import com.example.csc490seniorproject.screens.SplashScreen
 
 import com.example.csc490seniorproject.viewmodels.ProfileScreenVM
 import com.example.csc490seniorproject.viewmodels.WorkspaceViewModel
@@ -54,20 +53,9 @@ fun Nav(navController: NavHostController,
 
     NavHost(
         navController = navController,
-        startDestination = "SplashScreen",
+        startDestination = "LoginScreen",
         modifier = modifier
     ) {
-        composable(route = "SplashScreen") {
-            SplashScreen(
-                onSplashFinished = {
-                    navController.navigate("LoginScreen") {
-                        popUpTo("SplashScreen") {
-                            inclusive = true
-                        }
-                    }
-                }
-            )
-        }
 
         composable(route = "LoginScreen") {
             LoginScreen(

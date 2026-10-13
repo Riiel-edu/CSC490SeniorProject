@@ -2,4 +2,20 @@
 <resources>
 
     <style name="Theme.CSC490SeniorProject" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.CSC490SeniorProject.Starting"
+        parent="Theme.SplashScreen">
+
+        <item name="windowSplashScreenBackground">
+            @color/light_purple
+        </item>
+
+        <item name="windowSplashScreenAnimatedIcon">
+            @drawable/splash_logo
+        </item>
+
+        <item name="postSplashScreenTheme">
+            @style/Theme.CSC490SeniorProject
+        </item>
+    </style>
 </resources>
