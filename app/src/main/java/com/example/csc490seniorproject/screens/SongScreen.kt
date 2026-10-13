@@ -77,7 +77,7 @@ fun SongScreen(viewModel: LandingScreenVM) {
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Username", fontFamily = fredoka, fontSize = 24.sp)
+                Text("Song name", fontFamily = fredoka, fontSize = 24.sp)
 
                 Text("★★★★★", fontFamily = fredoka, fontSize = 24.sp)
             }

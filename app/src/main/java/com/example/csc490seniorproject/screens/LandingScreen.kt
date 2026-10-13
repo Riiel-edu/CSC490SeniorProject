@@ -108,7 +108,9 @@ fun LandingScreen(viewModel: LandingScreenVM, navController: NavController, user
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Button(
-                            onClick = { },
+                            onClick = {
+                                navController.navigate("BeatmapEditorScreen")
+                            },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF5d36eb),
                                 contentColor = Color.White
