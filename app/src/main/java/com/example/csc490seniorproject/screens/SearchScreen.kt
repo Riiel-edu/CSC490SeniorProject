@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -46,6 +47,7 @@ import androidx.navigation.NavController
 import com.example.csc490seniorproject.R
 import com.example.csc490seniorproject.viewmodels.LandingScreenVM
 import com.example.csc490seniorproject.viewmodels.SearchScreenVM
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
@@ -63,11 +65,45 @@ fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
 
         Spacer(modifier = Modifier.height(5.dp))
 
-        TextField(value = text, onValueChange = { text = it }, label = { Text("Search") }, modifier = Modifier.fillMaxWidth())
+        TextField(value = text, onValueChange = {
+            text = it
+            viewModel.searchUsers(it)
+                                                },
+            label = { Text("Search") }, modifier = Modifier.fillMaxWidth())
 
         Spacer(modifier = Modifier.height(10.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(viewModel.userResults) { user ->
+                Surface(
+                    color = Color(0xFFbfb1fa),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    shadowElevation = 30.dp
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(user.username, fontFamily = fredoka, color = Color.White, fontSize = 16.sp)
+
+                        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+                        if (currentUid != null && currentUid != user.uid) {
+                            if (viewModel.requestedUids.contains(user.uid)) {
+                                OutlinedButton(onClick = {}, enabled = false) {
+                                    Text("Request Sent", fontFamily = fredoka)
+                                }
+                            } else {
+                                Button(
+                                    onClick = { viewModel.sendFriendRequest(currentUid, user.uid) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5d36eb), contentColor = Color.White)
+                                ) { Text("Add Friend", fontFamily = fredoka) }
+                            }
+                        }
+                    }
+                }
+            }
             items(songsList) { currentItem ->
                 //Song block start
                 Surface(

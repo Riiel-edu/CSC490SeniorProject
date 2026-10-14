@@ -50,13 +50,17 @@ import androidx.navigation.NavController
 import com.example.csc490seniorproject.R
 import com.example.csc490seniorproject.viewmodels.LandingScreenVM
 import com.example.csc490seniorproject.viewmodels.ProfileScreenVM
+import com.google.firebase.auth.FirebaseAuth
+import com.example.csc490seniorproject.viewmodels.FriendStatus
 
 private enum class ProfileTab { SONGS, FRIENDS, CHATS }
+
 @Composable
 fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, username: String) {
+    val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+
     LaunchedEffect(username) {
-        viewModel.getFriends(username)
-        viewModel.getSongs(username)
+        viewModel.loadProfile(username, currentUid)
     }
     val fredoka = FontFamily(Font(R.font.fredoka_medium, FontWeight.Normal))
     val songsList = viewModel.songsList
@@ -65,7 +69,9 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
 
     var selectedTab by remember { mutableStateOf(ProfileTab.SONGS) }
 
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+    LazyColumn(modifier = Modifier
+        .fillMaxSize()
+        .padding(20.dp)) {
         item {
             Spacer(modifier = Modifier.height(2.5.dp))
 
@@ -103,15 +109,74 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                 ) {
                     Text(text = username, fontFamily = fredoka, fontSize = 24.sp)
 
-                    Button(
-                        onClick = {
+                    val profileUid = viewModel.profileUid
+                    if (currentUid == null || profileUid == null || currentUid == profileUid) {
+                        Button(
+                            onClick = { },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF5d36eb),
+                                contentColor = Color.White
+                            )
+                        ) { Text("✎ Edit Profile", fontFamily = fredoka) }
+                    } else {
+                        when (viewModel.friendStatus) {
+                            FriendStatus.NONE -> Button(
+                                onClick = { viewModel.sendFriendRequest(currentUid, profileUid) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(
+                                        0xFF5d36eb
+                                    ), contentColor = Color.White
+                                )
+                            ) { Text("+ Add Friend", fontFamily = fredoka) }
 
-                        }, colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF5d36eb),
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text("✎ Edit Profile", fontFamily = fredoka)
+                            FriendStatus.REQUEST_SENT -> Button(
+                                onClick = { },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Gray,
+                                    contentColor = Color.White
+                                )
+                            ) { Text("Request Sent", fontFamily = fredoka) }
+
+                            FriendStatus.REQUEST_RECEIVED -> Row(
+                                horizontalArrangement = Arrangement.spacedBy(
+                                    6.dp
+                                )
+                            ) {
+                                Button(
+                                    onClick = {
+                                        viewModel.acceptFriendRequest(
+                                            currentUid,
+                                            profileUid
+                                        )
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(
+                                            0xFF5d36eb
+                                        ), contentColor = Color.White
+                                    )
+                                ) { Text("Accept", fontFamily = fredoka) }
+                                Button(
+                                    onClick = {
+                                        viewModel.declineFriendRequest(
+                                            currentUid,
+                                            profileUid
+                                        )
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color.Gray,
+                                        contentColor = Color.White
+                                    )
+                                ) { Text("Decline", fontFamily = fredoka) }
+                            }
+
+                            FriendStatus.FRIENDS -> Button(
+                                onClick = { },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Gray,
+                                    contentColor = Color.White
+                                )
+                            ) { Text("✓ Friends", fontFamily = fredoka) }
+                        }
                     }
                 }
             }
@@ -318,10 +383,16 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f, fill = false)
                                         )
-                                        if(currentItem.rating > 4.5) {
+                                        if (currentItem.rating > 4.5) {
                                             Text(
                                                 buildAnnotatedString {
-                                                    withStyle(style = SpanStyle(color = Color(0xFF5d36eb))) {
+                                                    withStyle(
+                                                        style = SpanStyle(
+                                                            color = Color(
+                                                                0xFF5d36eb
+                                                            )
+                                                        )
+                                                    ) {
                                                         append("★★★★★")
                                                     }
                                                 },
@@ -331,10 +402,16 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
-                                        } else if(currentItem.rating > 3.5) {
+                                        } else if (currentItem.rating > 3.5) {
                                             Text(
                                                 buildAnnotatedString {
-                                                    withStyle(style = SpanStyle(color = Color(0xFF5d36eb))) {
+                                                    withStyle(
+                                                        style = SpanStyle(
+                                                            color = Color(
+                                                                0xFF5d36eb
+                                                            )
+                                                        )
+                                                    ) {
                                                         append("★★★★")
                                                     }
                                                     withStyle(style = SpanStyle(color = Color.White)) {
@@ -347,10 +424,16 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
-                                        } else if(currentItem.rating > 2.5) {
+                                        } else if (currentItem.rating > 2.5) {
                                             Text(
                                                 buildAnnotatedString {
-                                                    withStyle(style = SpanStyle(color = Color(0xFF5d36eb))) {
+                                                    withStyle(
+                                                        style = SpanStyle(
+                                                            color = Color(
+                                                                0xFF5d36eb
+                                                            )
+                                                        )
+                                                    ) {
                                                         append("★★★")
                                                     }
                                                     withStyle(style = SpanStyle(color = Color.White)) {
@@ -363,10 +446,16 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
-                                        } else if(currentItem.rating > 1.5) {
+                                        } else if (currentItem.rating > 1.5) {
                                             Text(
                                                 buildAnnotatedString {
-                                                    withStyle(style = SpanStyle(color = Color(0xFF5d36eb))) {
+                                                    withStyle(
+                                                        style = SpanStyle(
+                                                            color = Color(
+                                                                0xFF5d36eb
+                                                            )
+                                                        )
+                                                    ) {
                                                         append("★★")
                                                     }
                                                     withStyle(style = SpanStyle(color = Color.White)) {
@@ -382,7 +471,13 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                                         } else {
                                             Text(
                                                 buildAnnotatedString {
-                                                    withStyle(style = SpanStyle(color = Color(0xFF5d36eb))) {
+                                                    withStyle(
+                                                        style = SpanStyle(
+                                                            color = Color(
+                                                                0xFF5d36eb
+                                                            )
+                                                        )
+                                                    ) {
                                                         append("★")
                                                     }
                                                     withStyle(style = SpanStyle(color = Color.White)) {
@@ -464,7 +559,57 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             }
+
             ProfileTab.FRIENDS -> {
+                item {
+                    if (currentUid != null && currentUid == viewModel.profileUid && viewModel.incomingRequests.isNotEmpty()) {
+                        Text("Friend Requests", fontFamily = fredoka, fontSize = 18.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        viewModel.incomingRequests.forEach { requester ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Text(
+                                    requester.username,
+                                    fontFamily = fredoka,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Button(
+                                    onClick = {
+                                        viewModel.acceptFriendRequest(
+                                            currentUid,
+                                            requester.uid
+                                        )
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(
+                                            0xFF5d36eb
+                                        ), contentColor = Color.White
+                                    )
+                                ) { Text("Accept", fontFamily = fredoka) }
+                                Button(
+                                    onClick = {
+                                        viewModel.declineFriendRequest(
+                                            currentUid,
+                                            requester.uid
+                                        )
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color.Gray,
+                                        contentColor = Color.White
+                                    )
+                                ) { Text("Decline", fontFamily = fredoka) }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = Color.White, thickness = 2.dp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
                 items(friendsList) { currentItem ->
                     //Song block start
                     Surface(
@@ -543,7 +688,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                             ) {
                                 Button(
                                     onClick = {
-                                        navController.navigate("ProfileScreen")
+
                                     },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = Color(0xFF5d36eb),
@@ -567,6 +712,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             }
+
             ProfileTab.CHATS -> {
                 item {
                     ChatBox(friendUsernames = friendsList.map { it.username })
