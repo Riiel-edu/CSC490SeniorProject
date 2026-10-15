@@ -3,7 +3,7 @@ package com.example.csc490seniorproject.viewmodels
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.csc490seniorproject.audio.PlaybackEngine
+import com.example.csc490seniorproject.audio.HighQualityPlaybackEngine
 import com.example.csc490seniorproject.objects.Instrument
 import com.example.csc490seniorproject.objects.Note
 import com.example.csc490seniorproject.objects.Song
@@ -13,61 +13,108 @@ import com.example.csc490seniorproject.objects.totalSteps
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
+/**
+ * Owns the song currently being edited. Every mutating function here follows the
+ * same pattern: build a NEW Song (copy), push the old one onto the undo stack,
+ * then publish the new one. Nothing here touches Firebase or audio — those are
+ * separate layers that just read this state.
+ */
 class EditorScreenVM(application: Application) : AndroidViewModel(application) {
 
-    private val songFlow = MutableStateFlow(newSong(ownerId = ""))
-    val song: StateFlow<Song> = songFlow.asStateFlow()
+    // Starts with no owner set. Call setOwnerId(...) once, right after creation,
+    // with the signed-in user's id (e.g. FirebaseAuth.getInstance().currentUser?.uid).
+    private val _song = MutableStateFlow(newSong(ownerId = ""))
+    val song: StateFlow<Song> = _song.asStateFlow()
 
-    private val selectedTrackIdFlow = MutableStateFlow(songFlow.value.tracks.first().id)
-    val selectedTrackId: StateFlow<String> = selectedTrackIdFlow.asStateFlow()
+    // Which track is currently selected/active for editing in the piano roll.
+    private val _selectedTrackId = MutableStateFlow(_song.value.tracks.first().id)
+    val selectedTrackId: StateFlow<String> = _selectedTrackId.asStateFlow()
 
-    private val noteLengthFlow = MutableStateFlow(1)
-    val noteLengthSteps: StateFlow<Int> = noteLengthFlow.asStateFlow()
+    // --- Note length ----------------------------------------------------------
+    // The length (in steps) that the NEXT tapped-in note will use. Doesn't
+    // affect notes already placed — pick a length, then tap to place notes
+    // that long, the same way you'd pick a pencil size before drawing.
+    private val _noteLengthSteps = MutableStateFlow(1)
+    val noteLengthSteps: StateFlow<Int> = _noteLengthSteps.asStateFlow()
 
     fun setNoteLength(steps: Int) {
-        noteLengthFlow.value = steps.coerceIn(1, 16)
+        _noteLengthSteps.value = steps.coerceIn(1, 16)
     }
 
-    private val activeOctaveByTrackFlow = MutableStateFlow<Map<String, Int>>(emptyMap())
-    val activeOctaveByTrack: StateFlow<Map<String, Int>> = activeOctaveByTrackFlow.asStateFlow()
+    // --- Active octave per track -------------------------------------------------
+    // Which octave a NEWLY placed note uses for each (melodic) track — the grid
+    // itself shows one row per note name (no octave repeats); this decides which
+    // actual octave tapping a row resolves to. Editor UI state, never saved.
+    private val _activeOctaveByTrack = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val activeOctaveByTrack: StateFlow<Map<String, Int>> = _activeOctaveByTrack.asStateFlow()
 
     fun setActiveOctave(trackId: String, octave: Int) {
-        activeOctaveByTrackFlow.value = activeOctaveByTrackFlow.value + (trackId to octave.coerceIn(2, 7))
+        _activeOctaveByTrack.value = _activeOctaveByTrack.value + (trackId to octave.coerceIn(2, 7))
     }
 
+    /** Plays a pitch once without placing a note. */
     fun previewPitch(instrument: Instrument, pitch: Int) = playbackEngine.previewNote(instrument, pitch)
 
-    private val playbackEngine = PlaybackEngine(viewModelScope)
+    // --- Playback -----------------------------------------------------------------
+    // One engine per ViewModel instance. viewModelScope is cancelled automatically
+    // when this ViewModel is cleared, which stops any in-progress schedule loop too.
+    // SamplePlaybackEngine needs a Context to load sample files, which AndroidViewModel
+    // gives us via getApplication() — no manual wiring needed at the call site.
+    private val playbackEngine = HighQualityPlaybackEngine(getApplication(), viewModelScope)
     val isPlaying: StateFlow<Boolean> = playbackEngine.isPlaying
     val currentStep: StateFlow<Int> = playbackEngine.currentStep
 
-    fun playSong() = playbackEngine.play(songFlow.value)
+    init {
+        // Warms up SoundPool for the starting track's instrument so the very
+        // first tap-to-place preview doesn't have to wait on a cold sample load.
+        viewModelScope.launch { playbackEngine.preload(_song.value) }
+    }
+
+    /** Plays the current song from wherever the playhead currently is, looping until stopPlayback() is called. */
+    fun playSong() = playbackEngine.play(_song.value)
 
     fun stopPlayback() = playbackEngine.stop()
 
-    fun seekTo(step: Int) = playbackEngine.seekTo(step, songFlow.value.totalSteps())
+    /**
+     * Moves the playhead to [step]. Works whether the song is currently playing
+     * (jumps the live audio immediately) or stopped (just sets where the NEXT
+     * playSong() call will start from) — both are handled inside the engine.
+     */
+    fun seekTo(step: Int) = playbackEngine.seekTo(step, _song.value.totalSteps())
 
+    /** Convenience for a dedicated "restart" button: jumps the playhead straight back to the beginning. */
     fun restartFromStart() = seekTo(0)
 
     override fun onCleared() {
-        playbackEngine.stop()
+        playbackEngine.release()
         super.onCleared()
     }
 
+    // Undo support. Redo is intentionally left out for now — most mobile note
+    // editors skip it, and it's easy to add later by keeping a second stack.
     private val undoStack = ArrayDeque<Song>()
     private val maxUndo = 50
 
     val canUndo: Boolean get() = undoStack.isNotEmpty()
 
+    // --- Loading an existing song (used later by the Firebase layer) ---------
+
+    /** Replaces the in-memory song wholesale, e.g. after loading from Firestore. Clears undo. */
     fun loadSong(song: Song) {
         undoStack.clear()
-        songFlow.value = song
-        selectedTrackIdFlow.value = song.tracks.firstOrNull()?.id ?: ""
+        _song.value = song
+        _selectedTrackId.value = song.tracks.firstOrNull()?.id ?: ""
     }
 
+    /**
+     * Sets which user owns this song. Call this once, right after the ViewModel is
+     * created, with the signed-in user's id. Bypasses undo/mutate on purpose —
+     * this is bookkeeping, not something the user should be able to "undo".
+     */
     fun setOwnerId(ownerId: String) {
-        songFlow.value = songFlow.value.copy(ownerId = ownerId)
+        _song.value = _song.value.copy(ownerId = ownerId)
     }
 
     fun renameSong(name: String) = mutate { it.copy(name = name) }
@@ -76,23 +123,30 @@ class EditorScreenVM(application: Application) : AndroidViewModel(application) {
 
     fun setBars(bars: Int) = mutate { it.copy(bars = bars.coerceIn(1, 64)) }
 
+    // --- Track management -----------------------------------------------------
 
-    fun addTrack(name: String, instrument: Instrument) = mutate { song ->
-        val track = Track(name = name, instrument = instrument)
-        selectedTrackIdFlow.value = track.id
-        song.copy(tracks = song.tracks + track)
+    fun addTrack(name: String, instrument: Instrument) {
+        mutate { song ->
+            val track = Track(name = name, instrument = instrument)
+            _selectedTrackId.value = track.id
+            song.copy(tracks = song.tracks + track)
+        }
+        // Warm up this instrument's samples right away, so the first note
+        // placed on the new track previews instantly instead of waiting on
+        // a cold load the first time it's tapped.
+        viewModelScope.launch { playbackEngine.preload(_song.value) }
     }
 
     fun deleteTrack(trackId: String) = mutate { song ->
         val remaining = song.tracks.filterNot { it.id == trackId }
-        if (selectedTrackIdFlow.value == trackId) {
-            selectedTrackIdFlow.value = remaining.firstOrNull()?.id ?: ""
+        if (_selectedTrackId.value == trackId) {
+            _selectedTrackId.value = remaining.firstOrNull()?.id ?: ""
         }
         song.copy(tracks = remaining)
     }
 
     fun selectTrack(trackId: String) {
-        selectedTrackIdFlow.value = trackId
+        _selectedTrackId.value = trackId
     }
 
     fun setTrackVolume(trackId: String, volume: Float) = mutate { song ->
@@ -107,14 +161,26 @@ class EditorScreenVM(application: Application) : AndroidViewModel(application) {
         song.withTrack(trackId) { it.copy(solo = !it.solo) }
     }
 
-    fun placeNote(trackId: String, pitch: Int, startStep: Int, lengthSteps: Int = noteLengthFlow.value, velocity: Int = 100) {
+    // --- Note editing -----------------------------------------------------------
+    // Every function here takes an explicit trackId now, rather than relying on
+    // "the selected track" — now that every instrument is visible and editable
+    // at once (stacked, not tabbed), each grid edits its own track directly.
+
+    /**
+     * Places a note on the given track, replacing any note that already occupies
+     * that exact pitch/step (tapping an occupied cell overwrites it, which is the
+     * behavior people expect from grid-style note editors). Defaults to whatever
+     * length is currently selected via setNoteLength(), and plays the note once
+     * immediately so placing it doubles as hearing it.
+     */
+    fun placeNote(trackId: String, pitch: Int, startStep: Int, lengthSteps: Int = _noteLengthSteps.value, velocity: Int = 100) {
         mutate { song ->
             song.withTrack(trackId) { track ->
                 val withoutOverlap = track.notes.filterNot { it.pitch == pitch && it.startStep == startStep }
                 track.copy(notes = withoutOverlap + Note(pitch = pitch, startStep = startStep, lengthSteps = lengthSteps, velocity = velocity))
             }
         }
-        val instrument = songFlow.value.tracks.firstOrNull { it.id == trackId }?.instrument ?: return
+        val instrument = _song.value.tracks.firstOrNull { it.id == trackId }?.instrument ?: return
         playbackEngine.previewNote(instrument, pitch, velocity)
     }
 
@@ -124,6 +190,7 @@ class EditorScreenVM(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Drags an existing note to a new pitch/step, keeping its id, length, and velocity. */
     fun moveNote(trackId: String, noteId: String, newPitch: Int, newStartStep: Int) = mutate { song ->
         song.withTrack(trackId) { track ->
             val notes = track.notes.map { note ->
@@ -142,18 +209,23 @@ class EditorScreenVM(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // --- Undo -----------------------------------------------------------------
+
     fun undo() {
         val previous = undoStack.removeLastOrNull() ?: return
-        songFlow.value = previous
+        _song.value = previous
     }
 
+    // --- Internal helpers -------------------------------------------------------
+
+    /** Runs [transform] on the current song, pushing the old value onto the undo stack first. */
     private inline fun mutate(transform: (Song) -> Song) {
-        val current = songFlow.value
+        val current = _song.value
         val updated = transform(current)
         if (updated == current) return // no-op edit, don't pollute undo history
         undoStack.addLast(current)
         if (undoStack.size > maxUndo) undoStack.removeFirst()
-        songFlow.value = updated
+        _song.value = updated
     }
 
     private fun Song.withTrack(trackId: String, transform: (Track) -> Track): Song =

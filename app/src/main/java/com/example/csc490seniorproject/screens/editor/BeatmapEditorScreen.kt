@@ -20,6 +20,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -35,6 +37,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.csc490seniorproject.R
 import com.example.csc490seniorproject.objects.BeatNoteType
+import com.example.csc490seniorproject.objects.stepDurationMs
+import com.example.csc490seniorproject.objects.totalSteps
 import com.example.csc490seniorproject.viewmodels.BeatmapEditorVM
 import com.example.csc490seniorproject.viewmodels.WorkspaceViewModel
 
@@ -46,6 +50,27 @@ fun BeatmapEditorScreen(viewModel: BeatmapEditorVM, navController: NavController
     val beatmap by viewModel.beatmap.collectAsState()
     val activeNoteType by viewModel.activeNoteType.collectAsState()
     val workspaceViewModel: WorkspaceViewModel = viewModel(LocalContext.current as ComponentActivity)
+    val isSongPlaying by workspaceViewModel.isSongPlaying.collectAsState()
+    val currentSong by workspaceViewModel.currentSong.collectAsState()
+    val songStep by workspaceViewModel.songCurrentStep.collectAsState()
+
+    LaunchedEffect(Unit) { workspaceViewModel.seekSong(0) }
+
+    DisposableEffect(navController) {
+        val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
+            if (destination.route != "BeatmapEditorScreen") workspaceViewModel.stopSong()
+        }
+        navController.addOnDestinationChangedListener(listener)
+        onDispose { navController.removeOnDestinationChangedListener(listener) }
+    }
+
+    val songStepMs = currentSong?.stepDurationMs()
+    val beatmapStepMs = beatmap.stepDurationMs()
+    val playheadStep: Int? = songStepMs?.let { ms ->
+        ((songStep * ms) / beatmapStepMs).toInt().coerceIn(0, (beatmap.totalSteps() - 1).coerceAtLeast(0))
+    }
+
+
 
     Column(
         modifier = modifier
@@ -82,6 +107,15 @@ fun BeatmapEditorScreen(viewModel: BeatmapEditorVM, navController: NavController
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        TransportControls(
+            isPlaying = isSongPlaying,
+            onRestart = { workspaceViewModel.seekSong(0) },
+            onPlay = { workspaceViewModel.playSong() },
+            onStop = { workspaceViewModel.stopSong() }
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         LaneCountSelector(
             selected = beatmap.columnCount,
             onSelect = { count -> viewModel.setColumnCount(count) }
@@ -109,7 +143,14 @@ fun BeatmapEditorScreen(viewModel: BeatmapEditorVM, navController: NavController
             activeNoteType = activeNoteType,
             onPlaceNote = { column, step, length -> viewModel.placeNote(column, step, length) },
             onResizeNote = { noteId, length -> viewModel.resizeNote(noteId, length) },
-            onDeleteNote = { noteId -> viewModel.deleteNote(noteId) }
+            onDeleteNote = { noteId -> viewModel.deleteNote(noteId) },
+            playheadStep = playheadStep,
+            isPlaying = isSongPlaying,
+            onSeek = { beatmapStep ->
+                if (songStepMs != null) {
+                    workspaceViewModel.seekSong(((beatmapStep * beatmapStepMs) / songStepMs).toInt())
+                }
+            }
         )
     }
 }

@@ -1,17 +1,23 @@
 package com.example.csc490seniorproject.screens
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -39,6 +46,7 @@ import com.example.csc490seniorproject.objects.BeatNote
 import com.example.csc490seniorproject.objects.BeatNoteType
 import com.example.csc490seniorproject.objects.Beatmap
 import com.example.csc490seniorproject.objects.endStep
+import com.example.csc490seniorproject.objects.stepDurationMs
 import com.example.csc490seniorproject.objects.stepsPerBar
 import com.example.csc490seniorproject.objects.totalSteps
 
@@ -50,11 +58,11 @@ val listOf6Colors = listOf(Color(0xFFFF6B6B), Color(0xFFFF9F6B), Color(0xFFFFE66
 
 fun laneColors(columnCount: Int): List<Color> = if (columnCount == 6) listOf6Colors else listOf4Colors
 
-private fun DrawScope.drawNoteCircle(center: Offset, radius: Float, color: Color) {
-    drawCircle(color = Color.Black, radius = radius + 3f, center = center)      // outline
-    drawCircle(color = color, radius = radius, center = center)                 // outer fill
-    drawCircle(color = Color.White, radius = radius * 0.62f, center = center)   // white ring
-    drawCircle(color = color, radius = radius * 0.4f, center = center)          // inner dot
+fun DrawScope.drawNoteCircle(center: Offset, radius: Float, color: Color) {
+    drawCircle(color = Color.Black, radius = radius + 3f, center = center)
+    drawCircle(color = color, radius = radius, center = center)
+    drawCircle(color = Color.White, radius = radius * 0.62f, center = center)
+    drawCircle(color = color, radius = radius * 0.4f, center = center)
 }
 
 @Composable
@@ -63,52 +71,116 @@ fun BeatmapEditor(
     activeNoteType: BeatNoteType,
     onPlaceNote: (column: Int, step: Int, lengthSteps: Int) -> Unit,
     onResizeNote: (noteId: String, newLengthSteps: Int) -> Unit,
-    onDeleteNote: (noteId: String) -> Unit
+    onDeleteNote: (noteId: String) -> Unit,
+    playheadStep: Int? = null,
+    isPlaying: Boolean = false,
+    onSeek: (step: Int) -> Unit = {}
 ) {
     val totalSteps = beatmap.totalSteps()
     val stepsPerBar = beatmap.stepsPerBar()
     val hScroll = rememberScrollState()
+    val density = LocalDensity.current
+    val cellWidthPx = with(density) { 44.dp.toPx() }
 
-    Surface(
-        color = Color.White,
-        shape = RoundedCornerShape(10.dp),
-        shadowElevation = 12.dp,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Spacer(modifier = Modifier.width(64.dp).height(28.dp))
-                BarRuler(totalSteps = totalSteps, stepsPerBar = stepsPerBar, hScroll = hScroll)
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+
+        val viewportWidthPx = with(density) { (maxWidth - 64.dp).toPx() }
+
+        LaunchedEffect(playheadStep, isPlaying) {
+            if (isPlaying && playheadStep != null && viewportWidthPx > 0) {
+                val playheadPx = playheadStep * cellWidthPx
+                val target = (playheadPx - viewportWidthPx / 2f).toInt().coerceIn(0, hScroll.maxValue)
+                val stepMs = beatmap.stepDurationMs().toInt().coerceAtLeast(1)
+                hScroll.animateScrollTo(target, animationSpec = tween(durationMillis = stepMs, easing = LinearEasing))
             }
+        }
 
-            Row(modifier = Modifier.fillMaxWidth().height(40.dp * beatmap.columnCount)) {
-                LaneLabels(columnCount = beatmap.columnCount)
-                BeatGrid(
-                    columnCount = beatmap.columnCount,
-                    notes = beatmap.notes,
-                    totalSteps = totalSteps,
-                    stepsPerBar = stepsPerBar,
-                    hScroll = hScroll,
-                    activeNoteType = activeNoteType,
-                    onPlaceNote = onPlaceNote,
-                    onResizeNote = onResizeNote,
-                    onDeleteNote = onDeleteNote
-                )
+        Surface(
+            color = Color.White,
+            shape = RoundedCornerShape(10.dp),
+            shadowElevation = 12.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.width(64.dp).height(28.dp))
+                    SeekRuler(
+                        totalSteps = totalSteps,
+                        stepsPerBar = stepsPerBar,
+                        playheadStep = playheadStep,
+                        hScroll = hScroll,
+                        onSeek = onSeek
+                    )
+                }
+
+                Row(modifier = Modifier.fillMaxWidth().height(40.dp * beatmap.columnCount)) {
+                    LaneLabels(columnCount = beatmap.columnCount)
+                    BeatGrid(
+                        columnCount = beatmap.columnCount,
+                        notes = beatmap.notes,
+                        totalSteps = totalSteps,
+                        stepsPerBar = stepsPerBar,
+                        hScroll = hScroll,
+                        activeNoteType = activeNoteType,
+                        playheadStep = playheadStep,
+                        onPlaceNote = onPlaceNote,
+                        onResizeNote = onResizeNote,
+                        onDeleteNote = onDeleteNote
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun BarRuler(totalSteps: Int, stepsPerBar: Int, hScroll: androidx.compose.foundation.ScrollState) {
+private fun SeekRuler(
+    totalSteps: Int,
+    stepsPerBar: Int,
+    playheadStep: Int?,
+    hScroll: ScrollState,
+    onSeek: (Int) -> Unit
+) {
+    val density = LocalDensity.current
+    val cellWidthPx = with(density) { 44.dp.toPx() }
     val barCount = (totalSteps / stepsPerBar).coerceAtLeast(1)
-    Row(modifier = Modifier.height(28.dp).horizontalScroll(hScroll, enabled = false)) {
-        repeat(barCount) { barIndex ->
-            Box(
-                modifier = Modifier.width(44.dp * stepsPerBar).height(28.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "${barIndex + 1}", fontFamily = fredoka, fontSize = 12.sp, color = Color(0xFF5d36eb))
+    val totalWidth = 44.dp * totalSteps
+
+    fun stepAt(x: Float): Int = (x / cellWidthPx).toInt().coerceIn(0, totalSteps - 1)
+
+    Box(modifier = Modifier.height(28.dp).horizontalScroll(hScroll, enabled = false)) {
+        Box(
+            modifier = Modifier
+                .width(totalWidth)
+                .height(28.dp)
+                .pointerInput(totalSteps) {
+                    detectTapGestures { offset -> onSeek(stepAt(offset.x)) }
+                }
+                .pointerInput(totalSteps) {
+                    detectDragGestures { change, _ ->
+                        change.consume()
+                        onSeek(stepAt(change.position.x))
+                    }
+                }
+        ) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                repeat(barCount) { barIndex ->
+                    Box(
+                        modifier = Modifier.width(44.dp * stepsPerBar).height(28.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "${barIndex + 1}", fontFamily = fredoka, fontSize = 12.sp, color = Color(0xFF5d36eb))
+                    }
+                }
+            }
+            if (playheadStep != null) {
+                Box(
+                    modifier = Modifier
+                        .padding(start = 44.dp * playheadStep)
+                        .width(3.dp)
+                        .height(28.dp)
+                        .background(Color(0xFFFF6B6B))
+                )
             }
         }
     }
@@ -144,8 +216,9 @@ private fun BeatGrid(
     notes: List<BeatNote>,
     totalSteps: Int,
     stepsPerBar: Int,
-    hScroll: androidx.compose.foundation.ScrollState,
+    hScroll: ScrollState,
     activeNoteType: BeatNoteType,
+    playheadStep: Int?,
     onPlaceNote: (column: Int, step: Int, lengthSteps: Int) -> Unit,
     onResizeNote: (noteId: String, newLengthSteps: Int) -> Unit,
     onDeleteNote: (noteId: String) -> Unit
@@ -267,6 +340,12 @@ private fun BeatGrid(
                 } else {
                     drawNoteCircle(center = Offset(headX, rowCenterY), radius = radius, color = color)
                 }
+            }
+
+            // The play bar — drawn last so it sits on top of the notes.
+            if (playheadStep != null) {
+                val x = playheadStep * cellWidthPx
+                drawLine(color = Color(0xFF33313F), start = Offset(x, 0f), end = Offset(x, gridHeight.toPx()), strokeWidth = 3f)
             }
         }
     }
