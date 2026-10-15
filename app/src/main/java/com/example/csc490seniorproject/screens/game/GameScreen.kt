@@ -1,5 +1,7 @@
 package com.example.csc490seniorproject.screens
 
+import android.annotation.SuppressLint
+import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -18,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,36 +28,46 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.csc490seniorproject.R
 import com.example.csc490seniorproject.objects.Beatmap
 import com.example.csc490seniorproject.viewmodels.GameVM
 import com.example.csc490seniorproject.viewmodels.FallingNote
 import com.example.csc490seniorproject.viewmodels.Judgment
+import com.example.csc490seniorproject.viewmodels.WorkspaceViewModel
 import kotlinx.coroutines.delay
 
 private val Fredoka = FontFamily(Font(R.font.fredoka_medium, FontWeight.Normal))
-private val AccentPurple = Color(0xFF5d36eb)
-private val GameBackground = Color(0xFF221B3F) // dark, so falling notes/glow read clearly
+private val GameBackground = Color(0xFF221B3F)
 private val BUTTON_ROW_HEIGHT = 90.dp
 
-private val FALL_DURATION_MS = com.example.csc490seniorproject.viewmodels.GameVM.FALL_DURATION_MS
+private val FALL_DURATION_MS = GameVM.FALL_DURATION_MS
 
+@SuppressLint("ContextCastToActivity")
 @Composable
 fun GameScreen(viewModel: GameVM, beatmap: Beatmap, modifier: Modifier = Modifier) {
+    val workspaceViewModel: WorkspaceViewModel = viewModel(LocalContext.current as ComponentActivity)
+
     LaunchedEffect(beatmap.id) {
         viewModel.loadBeatmap(beatmap)
+        workspaceViewModel.prepareSong()
         viewModel.start()
+        workspaceViewModel.playSongFromStart(startDelayMs = GameVM.LEAD_IN_MS.toLong())
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { workspaceViewModel.stopSong() }
     }
 
     val elapsedMs by viewModel.elapsedMs.collectAsState()
@@ -67,13 +80,17 @@ fun GameScreen(viewModel: GameVM, beatmap: Beatmap, modifier: Modifier = Modifie
     val maxCombo by viewModel.maxCombo.collectAsState()
     val activeHoldColumns by viewModel.activeHoldColumns.collectAsState()
 
+    LaunchedEffect(isGameOver) {
+        if (isGameOver) workspaceViewModel.stopSong()
+    }
+
     val colors = laneColors(beatmap.columnCount)
 
     val visibleNotes = remember(elapsedMs, judgedIds) {
         viewModel.fallingNotes.filter { note ->
             note.id !in judgedIds &&
                     note.hitTimeMs - FALL_DURATION_MS <= elapsedMs &&
-                    note.hitTimeMs >= elapsedMs - 200 // keep it a beat after the hit line so a late hit still shows briefly
+                    note.hitTimeMs >= elapsedMs - 200
         }
     }
 
@@ -90,9 +107,9 @@ fun GameScreen(viewModel: GameVM, beatmap: Beatmap, modifier: Modifier = Modifie
                     onLaneRelease = { column -> viewModel.onLaneRelease(column) },
                     modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(BUTTON_ROW_HEIGHT)
                 )
+
                 FallingNotesField(
                     columnCount = beatmap.columnCount,
-                    colors = colors,
                     notes = visibleNotes,
                     elapsedMs = elapsedMs.toDouble()
                 )
@@ -162,7 +179,7 @@ private fun JudgmentPopup(judgment: Judgment?) {
 }
 
 @Composable
-private fun FallingNotesField(columnCount: Int, colors: List<Color>, notes: List<FallingNote>, elapsedMs: Double) {
+private fun FallingNotesField(columnCount: Int, notes: List<FallingNote>, elapsedMs: Double) {
     val density = LocalDensity.current
     val buttonHeightPx = with(density) { BUTTON_ROW_HEIGHT.toPx() }
 
@@ -176,31 +193,36 @@ private fun FallingNotesField(columnCount: Int, colors: List<Color>, notes: List
         }
 
         notes.forEach { note ->
-            val progress = ((elapsedMs - (note.hitTimeMs - FALL_DURATION_MS)) / FALL_DURATION_MS).coerceIn(0.0, 1.3)
-            val y = (hitLineY * progress).toFloat()
-            val laneX = note.column * laneWidth
-            val blockSize = laneWidth * 0.72f
-            val left = laneX + (laneWidth - blockSize) / 2f
-
             val isHold = note.releaseTimeMs > note.hitTimeMs
-            if (isHold) {
+            val color = if (isHold) Color.Green else Color.Blue
+            val laneX = note.column * laneWidth + laneWidth / 2f
+            val radius = laneWidth * 0.3f
 
+            val progress = ((elapsedMs - (note.hitTimeMs - FALL_DURATION_MS)) / FALL_DURATION_MS).coerceIn(0.0, 1.3)
+            val headY = (hitLineY * progress).toFloat()
+
+            if (isHold) {
                 val tailProgress = ((elapsedMs - (note.releaseTimeMs - FALL_DURATION_MS)) / FALL_DURATION_MS).coerceIn(0.0, 1.3)
                 val tailY = (hitLineY * tailProgress).toFloat()
-                drawRoundRect(
-                    color = colors.getOrElse(note.column) { AccentPurple }.copy(alpha = 0.55f),
-                    topLeft = Offset(left, tailY),
-                    size = Size(blockSize, (y - tailY).coerceAtLeast(blockSize)),
-                    cornerRadius = CornerRadius(blockSize * 0.3f, blockSize * 0.3f)
-                )
-            }
+                val barWidth = radius * 1.5f
+                val barHeight = (headY - tailY).coerceAtLeast(0f)
 
-            drawRoundRect(
-                color = colors.getOrElse(note.column) { AccentPurple },
-                topLeft = Offset(left, y - blockSize / 2f),
-                size = Size(blockSize, blockSize),
-                cornerRadius = CornerRadius(blockSize * 0.3f, blockSize * 0.3f)
-            )
+                drawRect(
+                    color = color,
+                    topLeft = Offset(laneX - barWidth / 2f, tailY),
+                    size = Size(barWidth, barHeight)
+                )
+                drawRect(
+                    color = Color.White,
+                    topLeft = Offset(laneX - barWidth * 0.12f, tailY),
+                    size = Size(barWidth * 0.24f, barHeight)
+                )
+
+                drawNoteCircle(center = Offset(laneX, tailY), radius = radius, color = color)
+                drawNoteCircle(center = Offset(laneX, headY), radius = radius, color = color)
+            } else {
+                drawNoteCircle(center = Offset(laneX, headY), radius = radius, color = color)
+            }
         }
     }
 }
