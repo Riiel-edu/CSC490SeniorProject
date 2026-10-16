@@ -92,7 +92,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                     border = BorderStroke(2.dp, Color(0xFF5d36eb))
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.splash_logo),
+                        painter = painterResource(id = R.drawable.default_pfp),
                         contentScale = ContentScale.Crop,
                         contentDescription = null,
                         modifier = Modifier
@@ -355,7 +355,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                                     border = BorderStroke(2.dp, Color.Black)
                                 ) {
                                     Image(
-                                        painter = painterResource(id = R.drawable.splash_logo),
+                                        painter = painterResource(id = R.drawable.default_pfp),
                                         contentScale = ContentScale.Crop,
                                         contentDescription = null,
                                         modifier = Modifier
@@ -631,7 +631,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                                     border = BorderStroke(2.dp, Color.Black)
                                 ) {
                                     Image(
-                                        painter = painterResource(id = R.drawable.splash_logo),
+                                        painter = painterResource(id = R.drawable.default_pfp),
                                         contentScale = ContentScale.Crop,
                                         contentDescription = null,
                                         modifier = Modifier

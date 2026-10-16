@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import com.example.csc490seniorproject.screens.BeatmapEditorScreen
 import com.example.csc490seniorproject.screens.EditorScreen
 import com.example.csc490seniorproject.screens.GameScreen
+import com.example.csc490seniorproject.screens.MySongsScreen
 import com.example.csc490seniorproject.screens.SettingsScreen
 import com.example.csc490seniorproject.viewmodels.BeatmapEditorVM
 import com.example.csc490seniorproject.viewmodels.GameVM
@@ -115,6 +116,13 @@ fun Nav(
 
         composable(route = "SearchScreen") {
             SearchScreen(
+                viewModel = searchScreenVM,
+                navController = navController
+            )
+        }
+
+        composable(route = "MySongsScreen") {
+            MySongsScreen(
                 viewModel = searchScreenVM,
                 navController = navController
             )

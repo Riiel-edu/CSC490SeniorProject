@@ -83,7 +83,7 @@ fun BeatmapEditorScreen(viewModel: BeatmapEditorVM, navController: NavController
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Button(
-                onClick = { navController.popBackStack() },
+                onClick = { navController.navigate("EditorScreen") },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFbfb1fa), contentColor = Color.White),
                 shape = RoundedCornerShape(10.dp)
             ) {
