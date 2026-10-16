@@ -179,7 +179,7 @@ fun LandingScreen(viewModel: LandingScreenVM, navController: NavController, user
                             border = BorderStroke(2.dp, Color.Black)
                         ) {
                             Image(
-                                painter = painterResource(id = R.drawable.android_icon),
+                                painter = painterResource(id = R.drawable.default_pfp),
                                 contentScale = ContentScale.Crop,
                                 contentDescription = null,
                                 modifier = Modifier

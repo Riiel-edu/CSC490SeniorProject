@@ -64,7 +64,7 @@ fun SongScreen(viewModel: LandingScreenVM) {
                 border = BorderStroke(2.dp, Color(0xFF5d36eb))
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.android_icon),
+                    painter = painterResource(id = R.drawable.default_pfp),
                     contentScale = ContentScale.Crop,
                     contentDescription = null,
                     modifier = Modifier.size(120.dp)

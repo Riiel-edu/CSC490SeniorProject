@@ -67,7 +67,8 @@ class MainActivity : ComponentActivity() {
                     currentRoute != null &&
                             currentRoute != "SplashScreen" &&
                             currentRoute != "LoginScreen" &&
-                            currentRoute != "RegisterScreen"
+                            currentRoute != "RegisterScreen" &&
+                            currentRoute != "GameScreen"
 
                 val navItemsList = listOf(
                     NavItem(
@@ -86,7 +87,7 @@ class MainActivity : ComponentActivity() {
                         title = "Create",
                         iconSelected = Icons.Filled.Add,
                         iconUnselected = Icons.Outlined.Add,
-                        route = "EditorScreen"
+                        route = "MySongsScreen"
                     ),
                     NavItem(
                         title = "Profile",

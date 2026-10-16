@@ -125,7 +125,7 @@ fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
                                 border = BorderStroke(2.dp, Color.Black)
                             ) {
                                 Image(
-                                    painter = painterResource(id = R.drawable.android_icon),
+                                    painter = painterResource(id = R.drawable.default_pfp),
                                     contentScale = ContentScale.Crop,
                                     contentDescription = null,
                                     modifier = Modifier
