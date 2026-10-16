@@ -39,8 +39,9 @@ import com.google.firebase.auth.FirebaseAuth
 
 @SuppressLint("ContextCastToActivity")
 @Composable
-fun Nav(navController: NavHostController,
-        modifier: Modifier
+fun Nav(
+    navController: NavHostController,
+    modifier: Modifier
 ) {
     val app = LocalContext.current.applicationContext as Application
 
@@ -132,6 +133,17 @@ fun Nav(navController: NavHostController,
                 viewModel = landingScreenVM,
                 onProfileClick = {
                     navController.navigate("ProfileScreen")
+                },
+                onLogoutClick = {
+                    FirebaseAuth.getInstance().signOut()
+                    currentUsername = "Username"
+
+                    navController.navigate("LoginScreen") {
+                        popUpTo(navController.graph.id) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
                 }
             )
         }
@@ -141,12 +153,17 @@ fun Nav(navController: NavHostController,
             LaunchedEffect(Unit) {
                 editorViewModel.setOwnerId(FirebaseAuth.getInstance().currentUser?.uid ?: "")
             }
-            EditorScreen(viewModel = editorViewModel, navController = navController, modifier = Modifier)
+            EditorScreen(
+                viewModel = editorViewModel,
+                navController = navController,
+                modifier = Modifier
+            )
         }
 
         composable("BeatmapEditorScreen") {
             val beatmapViewModel: BeatmapEditorVM = viewModel()
-            val workspaceViewModel: WorkspaceViewModel = viewModel(LocalContext.current as ComponentActivity)
+            val workspaceViewModel: WorkspaceViewModel =
+                viewModel(LocalContext.current as ComponentActivity)
             val currentSong by workspaceViewModel.currentSong.collectAsState()
 
             LaunchedEffect(currentSong?.id) {
@@ -155,12 +172,17 @@ fun Nav(navController: NavHostController,
                     ownerId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
                 )
             }
-            BeatmapEditorScreen(viewModel = beatmapViewModel, navController = navController, modifier = Modifier)
+            BeatmapEditorScreen(
+                viewModel = beatmapViewModel,
+                navController = navController,
+                modifier = Modifier
+            )
         }
 
         composable("GameScreen") {
             val gameViewModel: GameVM = viewModel()
-            val workspaceViewModel: WorkspaceViewModel = viewModel(LocalContext.current as ComponentActivity)
+            val workspaceViewModel: WorkspaceViewModel =
+                viewModel(LocalContext.current as ComponentActivity)
             val beatmap by workspaceViewModel.currentBeatmap.collectAsState()
 
             beatmap?.let {
