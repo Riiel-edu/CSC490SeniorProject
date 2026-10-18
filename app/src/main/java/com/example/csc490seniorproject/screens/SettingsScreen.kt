@@ -1,5 +1,6 @@
 package com.example.csc490seniorproject.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,12 +8,15 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -29,16 +33,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.csc490seniorproject.viewmodels.LandingScreenVM
-
-private val Purple = Color(0xFF683CF5)
-private val CardPurple = Color(0xFFE0D2FF)
-
-
 @Composable
-fun SettingsScreen(  viewModel: LandingScreenVM,
-                     modifier: Modifier = Modifier,
-                     onProfileClick: () -> Unit = {}
-) {
+fun SettingsScreen(viewModel: LandingScreenVM,
+                    modifier: Modifier = Modifier,
+                    onProfileClick: () -> Unit = {},
+                    onLogoutClick: () -> Unit) {
+
     var musicOn by rememberSaveable { mutableStateOf(true) }
     var soundEffectsOn by rememberSaveable { mutableStateOf(true) }
     var soundCheckOn by rememberSaveable { mutableStateOf(false) }
@@ -50,6 +50,11 @@ fun SettingsScreen(  viewModel: LandingScreenVM,
 
     var openDialog by remember { mutableStateOf<String?>(null) }
     var showAbout by remember { mutableStateOf(false) }
+
+    val Purple = Color(0xFF683CF5)
+    val CardPurple = Color(0xFFE0D2FF)
+    val LogoutRed = Color(0xFF683CF5)
+
 
     Column(
         modifier = modifier
@@ -66,7 +71,7 @@ fun SettingsScreen(  viewModel: LandingScreenVM,
         )
         Text("Make HipPop your own", color = Color.DarkGray)
 
-        SettingsCard("Audio") {
+        SettingsCard("Audio", CardPurple, Purple) {
             SettingsSwitch(
                 title = "Music",
                 description = "Play music while using the app",
@@ -106,7 +111,7 @@ fun SettingsScreen(  viewModel: LandingScreenVM,
             }
         }
 
-        SettingsCard("Downloads") {
+        SettingsCard("Downloads", CardPurple, Purple) {
             SettingsSwitch(
                 title = "Download over mobile data",
                 description = "Allow downloads without Wi-Fi",
@@ -115,19 +120,46 @@ fun SettingsScreen(  viewModel: LandingScreenVM,
             )
         }
 
-        SettingsCard("Account") {
-            SettingsChoice(
-                title = "Profile",
-                value = "Your songs and account information",
-                onClick = onProfileClick
-            )
+        SettingsCard("Account", CardPurple, Purple) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onProfileClick)
+                    .padding(vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Profile ›",
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Your songs and account information",
+                    fontSize = 12.sp,
+                    color = Color.DarkGray
+                )
+            }
         }
 
-        SettingsCard("About") {
+        SettingsCard("About", CardPurple, Purple) {
             SettingsChoice(
                 title = "HipPop",
                 value = "App information",
                 onClick = { showAbout = true }
+            )
+        }
+        OutlinedButton(
+            onClick = onLogoutClick,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, Color(0xFF843FC0)),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = Color(0xE9823FCB)
+            )
+        ) {
+            Text(
+                text = "Log Out",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
             )
         }
     }
@@ -190,10 +222,12 @@ fun SettingsScreen(  viewModel: LandingScreenVM,
 @Composable
 private fun SettingsCard(
     title: String,
+    cardColor: Color,
+    titleColor: Color,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Surface(
-        color = CardPurple,
+        color = cardColor,
         shape = RoundedCornerShape(18.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -203,7 +237,7 @@ private fun SettingsCard(
         ) {
             Text(
                 text = title,
-                color = Purple,
+                color = titleColor,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
