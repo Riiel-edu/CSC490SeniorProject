@@ -32,7 +32,7 @@ class BeatmapEditorVM(application: Application) : AndroidViewModel(application) 
         beatmapFlow.value = beatmap
     }
 
-    fun startNewBeatmap(songId: String, ownerId: String, columnCount: Int = 4, bpm: Int = 120, bars: Int = 4) {
+    fun startNewBeatmap(songId: String, ownerId: String, columnCount: Int = 4, bpm: Int = 120, bars: Int = 64) {
         undoStack.clear()
         beatmapFlow.value = newBeatmap(songId, ownerId, columnCount, bpm, bars)
     }

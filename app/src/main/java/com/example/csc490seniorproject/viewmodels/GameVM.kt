@@ -1,3 +1,4 @@
+
 package com.example.csc490seniorproject.viewmodels
 
 import android.app.Application
@@ -25,23 +26,16 @@ enum class Judgment(val points: Int, val label: String) {
     MISS(0, "Miss")
 }
 
-/**
- * Star tiers, by percentage of the theoretical max score (see
- * GameVM.computeMaxScore). Breakpoints are every 17.5% up through 87.5% (one
- * star per tier), then GOLD is reserved for hitting the ceiling exactly —
- * it's not just "the next 17.5% step," it's "you hit the actual max."
- */
 enum class StarRating(val label: String, val starsFilled: Int) {
-    ZERO("Try Again!", 0),
-    ONE("Bad Job!", 1),
-    TWO("Nice Job!", 2),
-    THREE("Good Job!", 3),
-    FOUR("Great Job!", 4),
-    FIVE("Amazing Job!", 5),
-    GOLD("\u2728 Full Combo, Perfect Score! \u2728", 5)
+    ZERO("", 0),
+    ONE("1 Star", 1),
+    TWO("2 Stars", 2),
+    THREE("3 Stars", 3),
+    FOUR("4 Stars", 4),
+    FIVE("5 Stars", 5),
+    GOLD("\u2728 GOLD! \u2728", 5)
 }
 
-/** [percent] is 0..100 (or higher, clamped). Safe to call with maxScore == 0 (treated as 0%). */
 fun starsForPercent(percent: Double): StarRating = when {
     percent >= 100.0 -> StarRating.GOLD
     percent >= 87.5 -> StarRating.FIVE
@@ -57,18 +51,24 @@ data class FallingNote(
     val column: Int,
     val hitTimeMs: Double,
     val releaseTimeMs: Double,
-    val type: BeatNoteType // FIX: the real type, copied from the source BeatNote —
-    // see onLanePress() and GameScreen's FallingNotesField for why this
-    // can't be inferred from releaseTimeMs > hitTimeMs (that's always true)
+    val type: BeatNoteType
 )
+
+data class TapHitEffect(
+    val id: String,
+    val column: Int
+)
+
 class GameVM(application: Application) : AndroidViewModel(application) {
 
     private var beatmap: Beatmap = Beatmap()
+
     var fallingNotes: List<FallingNote> = emptyList()
         private set
 
     private val _elapsedMs = MutableStateFlow(0L)
     val elapsedMs: StateFlow<Long> = _elapsedMs.asStateFlow()
+
     private val _judgedNoteIds = MutableStateFlow<Set<String>>(emptySet())
     val judgedNoteIds: StateFlow<Set<String>> = _judgedNoteIds.asStateFlow()
 
@@ -84,36 +84,38 @@ class GameVM(application: Application) : AndroidViewModel(application) {
     private val _isOnFire = MutableStateFlow(false)
     val isOnFire: StateFlow<Boolean> = _isOnFire.asStateFlow()
 
-    // The most recent judgment, for a brief "Perfect!" / "Miss" popup. Not
-    // cleared automatically — the UI decides how long to show it and clears
-    // it itself (see GameScreen's LaunchedEffect), since that's a display
-    // concern, not a game-logic one.
     private val _lastJudgment = MutableStateFlow<Judgment?>(null)
     val lastJudgment: StateFlow<Judgment?> = _lastJudgment.asStateFlow()
 
     private val _isGameOver = MutableStateFlow(false)
     val isGameOver: StateFlow<Boolean> = _isGameOver.asStateFlow()
 
-    // Real per-judgment counts for the post-game report — previously the
-    // report just displayed maxCombo in every row, which was wrong for
-    // everything except the "Best Combo" line itself.
     private val _perfectCount = MutableStateFlow(0)
     val perfectCount: StateFlow<Int> = _perfectCount.asStateFlow()
+
     private val _goodCount = MutableStateFlow(0)
     val goodCount: StateFlow<Int> = _goodCount.asStateFlow()
+
     private val _okCount = MutableStateFlow(0)
     val okCount: StateFlow<Int> = _okCount.asStateFlow()
+
     private val _missCount = MutableStateFlow(0)
     val missCount: StateFlow<Int> = _missCount.asStateFlow()
 
-    /** The theoretical ceiling for this beatmap — see computeMaxScore(). Fixed once loadBeatmap() runs. */
+    private val _tapHitEffect = MutableStateFlow<TapHitEffect?>(null)
+    val tapHitEffect: StateFlow<TapHitEffect?> = _tapHitEffect.asStateFlow()
+
+    private val _holdReleaseEffect = MutableStateFlow<TapHitEffect?>(null)
+
+    val holdReleaseEffect: StateFlow<TapHitEffect?> =
+        _holdReleaseEffect.asStateFlow()
+
     var maxPossibleScore: Int = 0
         private set
 
     private var job: Job? = null
     private var totalDurationMs: Double = 0.0
 
-    /** A HOLD note currently being held down, tracked from press until release. */
     private data class ActiveHold(
         val noteId: String,
         val pressStartMs: Long,
@@ -130,6 +132,7 @@ class GameVM(application: Application) : AndroidViewModel(application) {
     fun loadBeatmap(beatmap: Beatmap) {
         stop()
         this.beatmap = beatmap
+
         val stepMs = beatmap.stepDurationMs()
 
         fallingNotes = beatmap.notes.map { note ->
@@ -138,34 +141,38 @@ class GameVM(application: Application) : AndroidViewModel(application) {
                 column = note.column,
                 hitTimeMs = note.startStep * stepMs + LEAD_IN_MS,
                 releaseTimeMs = note.endStep() * stepMs + LEAD_IN_MS,
-                type = note.type // FIX: carry the real type through, don't infer it later
+                type = note.type
             )
         }
+
         totalDurationMs = beatmap.totalSteps() * stepMs + LEAD_IN_MS
         maxPossibleScore = computeMaxScore(beatmap, stepMs)
         resetRunState()
     }
 
-    /**
-     * Simulates an IDEAL perfect run — every note hit Perfect, in time
-     * order — using the exact same combo/On-Fire/hold-bonus math as real
-     * play, so the result is a genuine ceiling, not a rough estimate. Notes
-     * are processed in startStep order since that's the order combo would
-     * actually build up in during real play (combo is global across every
-     * lane, not per-lane).
-     */
     private fun computeMaxScore(beatmap: Beatmap, stepMs: Double): Int {
-        var combo = 0
+        var currentCombo = 0
         var total = 0.0
+
         beatmap.notes.sortedBy { it.startStep }.forEach { note ->
-            combo++
-            val multiplier = if (combo >= ON_FIRE_COMBO_THRESHOLD) ON_FIRE_MULTIPLIER else 1.0
+            currentCombo++
+
+            val multiplier =
+                if (currentCombo >= ON_FIRE_COMBO_THRESHOLD) {
+                    ON_FIRE_MULTIPLIER
+                } else {
+                    1.0
+                }
+
             total += Judgment.PERFECT.points * multiplier
+
             if (note.type == BeatNoteType.HOLD) {
                 val fullHoldSeconds = (note.lengthSteps * stepMs) / 1000.0
-                total += (Judgment.PERFECT.points / 5.0) * fullHoldSeconds * multiplier
+                total += (Judgment.PERFECT.points / 5.0) *
+                        fullHoldSeconds * multiplier
             }
         }
+
         return total.toInt()
     }
 
@@ -182,23 +189,50 @@ class GameVM(application: Application) : AndroidViewModel(application) {
         _goodCount.value = 0
         _okCount.value = 0
         _missCount.value = 0
+        _activeHolds.value = emptyMap()
+        _activeHoldColumns.value = emptySet()
+        _tapHitEffect.value = null
+        _holdReleaseEffect.value = null
     }
 
     fun start() {
         job?.cancel()
         resetRunState()
+
         val startTime = System.currentTimeMillis()
+
         job = viewModelScope.launch(Dispatchers.Default) {
+            var completionStartedAt: Long? = null
+
             while (isActive) {
                 val now = System.currentTimeMillis() - startTime
                 _elapsedMs.value = now
+
                 autoMissExpiredNotes(now.toDouble())
 
-                if (now > totalDurationMs + OK_WINDOW_MS + 500) {
-                    _isGameOver.value = true
-                    break
+                val allJudged =
+                    _judgedNoteIds.value.size >= fallingNotes.size
+
+                val noActiveHolds = _activeHolds.value.isEmpty()
+
+                // All notes must be judged and every hold must be released.
+                val gameplayComplete = allJudged && noActiveHolds
+
+                if (gameplayComplete) {
+                    if (completionStartedAt == null) {
+                        completionStartedAt = now
+                    }
+
+                    if (now - completionStartedAt >= END_DELAY_MS) {
+                        _isGameOver.value = true
+                        break
+                    }
+                } else {
+                    // Do not count down toward game over while a hold remains.
+                    completionStartedAt = null
                 }
-                delay(16) // ~60fps
+
+                delay(16)
             }
         }
     }
@@ -215,13 +249,17 @@ class GameVM(application: Application) : AndroidViewModel(application) {
 
     private fun autoMissExpiredNotes(nowMs: Double) {
         val judged = _judgedNoteIds.value
-        val newlyMissed = fallingNotes.filter { it.id !in judged && nowMs > it.hitTimeMs + OK_WINDOW_MS }
+
+        val newlyMissed = fallingNotes.filter { note ->
+            note.id !in judged &&
+                    nowMs > note.hitTimeMs + OK_WINDOW_MS
+        }
+
         if (newlyMissed.isEmpty()) return
+
         _judgedNoteIds.value = judged + newlyMissed.map { it.id }
-        // Count every individually missed note (a batch can contain more
-        // than one if several expire within the same ~16ms frame), even
-        // though the combo only needs to be broken once for the whole batch.
         _missCount.value = _missCount.value + newlyMissed.size
+
         registerMiss()
     }
 
@@ -233,6 +271,7 @@ class GameVM(application: Application) : AndroidViewModel(application) {
 
     fun onLanePress(column: Int) {
         if (_isGameOver.value) return
+
         val now = _elapsedMs.value.toDouble()
         val judged = _judgedNoteIds.value
 
@@ -245,61 +284,84 @@ class GameVM(application: Application) : AndroidViewModel(application) {
         _judgedNoteIds.value = judged + candidate.id
 
         val offset = abs(now - candidate.hitTimeMs)
+
         val judgment = when {
             offset <= PERFECT_WINDOW_MS -> Judgment.PERFECT
             offset <= GOOD_WINDOW_MS -> Judgment.GOOD
             else -> Judgment.OK
         }
-        val multiplier = registerHit(judgment)
 
-        // FIX: was `candidate.releaseTimeMs > candidate.hitTimeMs`, which is
-        // ALWAYS true — even a 1-step TAP has endStep() = startStep + 1, so
-        // releaseTimeMs is always greater than hitTimeMs by one step. Every
-        // tap was silently being treated as a hold here, starting hold-bonus
-        // tracking (and lighting up the lane button) on notes that should
-        // have resolved instantly.
+        val multiplier = registerHit(judgment)
         val isHold = candidate.type == BeatNoteType.HOLD
+
         if (isHold) {
-            _activeHolds.value = _activeHolds.value + (column to ActiveHold(
-                noteId = candidate.id,
-                pressStartMs = _elapsedMs.value,
-                basePoints = judgment.points,
-                multiplier = multiplier,
-                maxHoldMs = candidate.releaseTimeMs - candidate.hitTimeMs
-            ))
+            _activeHolds.value = _activeHolds.value + (
+                    column to ActiveHold(
+                        noteId = candidate.id,
+                        pressStartMs = _elapsedMs.value,
+                        basePoints = judgment.points,
+                        multiplier = multiplier,
+                        maxHoldMs = candidate.releaseTimeMs - candidate.hitTimeMs
+                    )
+                    )
+
             _activeHoldColumns.value = _activeHolds.value.keys
+        } else {
+            // A unique note ID triggers a short TAP pop animation.
+            _tapHitEffect.value = TapHitEffect(
+                id = candidate.id,
+                column = column
+            )
         }
     }
 
     fun onLaneRelease(column: Int) {
         val active = _activeHolds.value[column] ?: return
+
+        // Trigger a pop effect at the lane where the hold was released.
+        _holdReleaseEffect.value = TapHitEffect(
+            id = active.noteId,
+            column = column
+        )
+
         _activeHolds.value = _activeHolds.value - column
         _activeHoldColumns.value = _activeHolds.value.keys
 
-        val heldMs = (_elapsedMs.value - active.pressStartMs).coerceIn(0L, active.maxHoldMs.toLong())
+        val heldMs = (
+                _elapsedMs.value - active.pressStartMs
+                ).coerceIn(0L, active.maxHoldMs.toLong())
+
         val secondsHeld = heldMs / 1000.0
-        val bonus = (active.basePoints / 5.0) * secondsHeld * active.multiplier
+        val bonus = (active.basePoints / 5.0) *
+                secondsHeld * active.multiplier
+
         _score.value += bonus.toInt()
     }
 
     private fun registerHit(judgment: Judgment): Double {
         when (judgment) {
-            Judgment.PERFECT -> _perfectCount.value = _perfectCount.value + 1
-            Judgment.GOOD -> _goodCount.value = _goodCount.value + 1
-            Judgment.OK -> _okCount.value = _okCount.value + 1
-            Judgment.MISS -> Unit // registerHit is never actually called with MISS; registerMiss() handles that path
+            Judgment.PERFECT -> _perfectCount.value++
+            Judgment.GOOD -> _goodCount.value++
+            Judgment.OK -> _okCount.value++
+            Judgment.MISS -> Unit
         }
 
         val newCombo = _combo.value + 1
         _combo.value = newCombo
-        if (newCombo > _maxCombo.value) _maxCombo.value = newCombo
+
+        if (newCombo > _maxCombo.value) {
+            _maxCombo.value = newCombo
+        }
 
         val onFire = newCombo >= ON_FIRE_COMBO_THRESHOLD
         _isOnFire.value = onFire
 
-        val multiplier = if (onFire) ON_FIRE_MULTIPLIER else 1.0
+        val multiplier =
+            if (onFire) ON_FIRE_MULTIPLIER else 1.0
+
         _score.value += (judgment.points * multiplier).toInt()
         _lastJudgment.value = judgment
+
         return multiplier
     }
 
@@ -313,5 +375,7 @@ class GameVM(application: Application) : AndroidViewModel(application) {
 
         const val ON_FIRE_COMBO_THRESHOLD = 10
         const val ON_FIRE_MULTIPLIER = 1.5
+
+        const val END_DELAY_MS = 1_000L
     }
 }

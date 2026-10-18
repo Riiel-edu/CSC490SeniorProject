@@ -164,7 +164,12 @@ fun Nav(navController: NavHostController,
             val beatmap by workspaceViewModel.currentBeatmap.collectAsState()
 
             beatmap?.let {
-                GameScreen(viewModel = gameViewModel, beatmap = it, modifier = Modifier)
+                GameScreen(
+                    viewModel = gameViewModel,
+                    beatmap = it,
+                    navController = navController, // the NavHost's own controller, already in scope here
+                    modifier = Modifier
+                )
             }
         }
 
