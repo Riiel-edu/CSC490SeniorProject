@@ -48,7 +48,6 @@ fun Nav(
     val landingScreenVM = viewModel { LandingScreenVM(app) }
     val searchScreenVM = viewModel { SearchScreenVM(app) }
     val profileScreenVM = viewModel { ProfileScreenVM(app) }
-    val beatmapViewModel = viewModel { BeatmapEditorVM(app) }
     var currentUsername by rememberSaveable {
         mutableStateOf("Username")
     }
@@ -104,6 +103,13 @@ fun Nav(
 
         composable(route = "SongScreen") {
             SongScreen(landingScreenVM)
+        }
+
+        composable("SongScreen/{songId}") { entry ->
+            SongScreen(
+                viewModel = landingScreenVM,
+                songId = entry.arguments?.getString("songId").orEmpty()
+            )
         }
 
         composable(route = "ProfileScreen") {
@@ -194,15 +200,6 @@ fun Nav(
                 )
             }
         }
-
-        composable(route = "BeatmapEditorScreen") {
-            LaunchedEffect(Unit) {
-                beatmapViewModel.startNewBeatmap(
-                    songId = "NULL",
-                    ownerId = "NULL"
-                )
-            }
-            BeatmapEditorScreen(viewModel = beatmapViewModel, navController, modifier = Modifier)
-        }
     }
+
 }
