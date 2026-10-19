@@ -26,6 +26,10 @@ import kotlin.random.Random
 
 private const val SAMPLE_RATE = 44100
 
+/**
+ * Deprecated
+ */
+
 class PlaybackEngine(private val scope: CoroutineScope) {
 
     private val _isPlaying = MutableStateFlow(false)

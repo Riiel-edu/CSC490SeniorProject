@@ -13,7 +13,7 @@ data class Song(
     val bpm: Int = 120,
     val stepsPerBeat: Int = 4,
     val beatsPerBar: Int = 4,
-    val bars: Int = 4,
+    val bars: Int = 64,
     val tracks: List<Track> = emptyList(),
     @ServerTimestamp val createdAt: Date? = null,
     @ServerTimestamp val updatedAt: Date? = null

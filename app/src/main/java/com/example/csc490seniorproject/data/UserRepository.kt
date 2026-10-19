@@ -73,3 +73,28 @@ fun getUserProfile(
         .addOnFailureListener { e -> onFailure(e) }
 }
 
+fun getEmailForUsername(
+    username: String,
+    onSuccess: (String) -> Unit,
+    onNotFound: () -> Unit,
+    onFailure: (Exception) -> Unit
+) {
+    val db = FirebaseFirestore.getInstance()
+    val usernameKey = username.lowercase()
+    db.collection("usernames").document(usernameKey).get()
+        .addOnSuccessListener { usernameSnap ->
+            val uid = usernameSnap.getString("uid")
+            if (!usernameSnap.exists() || uid == null) {
+                onNotFound()
+                return@addOnSuccessListener
+            }
+            db.collection("users").document(uid).get()
+                .addOnSuccessListener { userSnap ->
+                    val email = userSnap.getString("email")
+                    if (email != null) onSuccess(email) else onNotFound()
+                }
+                .addOnFailureListener { e -> onFailure(e) }
+        }
+        .addOnFailureListener { e -> onFailure(e) }
+}
+
