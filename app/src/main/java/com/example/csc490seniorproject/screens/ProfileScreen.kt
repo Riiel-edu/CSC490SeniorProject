@@ -58,15 +58,45 @@ import androidx.compose.runtime.mutableStateListOf
 import com.example.csc490seniorproject.objects.Song
 import com.google.firebase.firestore.FirebaseFirestore
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableStateMapOf
 import java.util.Locale
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Icon
 private enum class ProfileTab { SONGS, FRIENDS, CHATS }
 @Composable
 fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, username: String) {
+    var isEditing by remember(username) {
+        mutableStateOf(false)
+    }
+    var editableUsername by remember(username) {
+        mutableStateOf(username)
+    }
+    var aboutMe by remember(username) {
+        mutableStateOf("This is the about me section. Users are free to type a brief description for other users to get to know them.")
+    }
+    var profilePictureUri by remember(username) {
+        mutableStateOf<Uri?>(null)
+    }
+
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            profilePictureUri = uri
+        }
+    }
     val auth = remember { FirebaseAuth.getInstance() }
     val db = remember { FirebaseFirestore.getInstance() }
     val fredoka = remember {
@@ -202,19 +232,54 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Surface(
-                    shape = CircleShape,
-                    shadowElevation = 30.dp,
-                    border = BorderStroke(2.dp, ProfilePurple)
+                Box(
+                    modifier = Modifier.size(120.dp)
                 ) {
-                    Image(
-                        painter = painterResource(R.drawable.default_pfp),
-                        contentDescription = "Profile picture",
-                        contentScale = ContentScale.Crop,
+                    Surface(
+                        shape = CircleShape,
+                        shadowElevation = 8.dp,
+                        border = BorderStroke(2.dp, ProfilePurple),
                         modifier = Modifier
-                            .size(120.dp)
+                            .fillMaxSize()
                             .clip(CircleShape)
-                    )
+                            .clickable(enabled = isEditing) {
+                                imagePicker.launch("image/*")
+                            }
+                    ) {
+                        if (profilePictureUri != null) {
+                            coil.compose.AsyncImage(
+                                model = profilePictureUri,
+                                contentDescription = "Profile picture",
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Image(
+                                painter = painterResource(R.drawable.default_pfp),
+                                contentDescription = "Profile picture",
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+
+                    if (isEditing) {
+                        Surface(
+                            shape = CircleShape,
+                            color = ProfilePurple,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .size(36.dp)
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Edit profile picture",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Column(
@@ -224,13 +289,20 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                         .padding(vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = username,
-                        fontFamily = fredoka,
-                        fontSize = 24.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    if (isEditing) {
+                        OutlinedTextField(
+                            value = editableUsername,
+                            onValueChange = { editableUsername = it },
+                            placeholder = { Text("Enter username") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        Text(
+                            text = editableUsername,
+                            fontFamily = fredoka
+                        )
+                    }
 
                     if (
                         currentUid != null &&
@@ -238,7 +310,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                         currentUid == profileUid
                     ) {
                         Button(
-                            onClick = { },
+                            onClick = { isEditing = !isEditing},
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = ProfilePurple
                             )
@@ -338,17 +410,22 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                 color = Color.White,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "This is the about me section. Users are free " +
-                            "to type a brief description for other users " +
-                            "to get to know them.",
-                    fontFamily = fredoka,
-                    fontSize = 13.sp,
-                    color = Color(0xFF444444),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(8.dp)
-                )
+                if (isEditing) {
+                    OutlinedTextField(
+                        value = aboutMe,
+                        onValueChange = { aboutMe = it },
+                        placeholder = { Text("Write about yourself...") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text(
+                        text = aboutMe,
+                        fontFamily = fredoka,
+                        fontSize = 13.sp,
+                        color = Color(0xFF444444),
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
             }
 
             Spacer(Modifier.height(20.dp))
