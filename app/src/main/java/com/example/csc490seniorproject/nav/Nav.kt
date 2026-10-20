@@ -54,7 +54,8 @@ fun Nav(
 
     NavHost(
         navController = navController,
-        startDestination = "LoginScreen",
+        startDestination =
+            if (FirebaseAuth.getInstance().currentUser != null) "LandingScreen" else "LoginScreen",
         modifier = modifier
     ) {
 
