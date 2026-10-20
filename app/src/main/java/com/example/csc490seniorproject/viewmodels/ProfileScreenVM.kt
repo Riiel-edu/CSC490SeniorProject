@@ -12,6 +12,8 @@ import com.example.csc490seniorproject.objects.User
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
+import kotlin.collections.set
+import kotlin.text.get
 
 enum class FriendStatus { NONE, REQUEST_SENT, REQUEST_RECEIVED, FRIENDS }
 
@@ -23,7 +25,9 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
     var profileUid by mutableStateOf<String?>(null)
     var friendStatus by mutableStateOf(FriendStatus.NONE)
     val incomingRequests = mutableStateListOf<User>()
-
+    var profileUsername by mutableStateOf("")
+    var aboutMe by mutableStateOf("")
+    var profilePictureUrl by mutableStateOf("")
     private val db = FirebaseFirestore.getInstance()
 
     init {
@@ -51,6 +55,7 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
                 friends = friendsList
             ))
             messageList.add("Hey")
+
         }
     }
 
@@ -201,4 +206,39 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
                 }
             }
     }
+
+    fun getProfileDetails(myUid: String, onLoaded: () -> Unit = {}) {
+        db.collection("users").document(myUid).get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    profileUsername = document.getString("username") ?: ""
+                    aboutMe = document.getString("aboutMe") ?: ""
+                    profilePictureUrl = document.getString("profilePictureUrl") ?: ""
+
+                    onLoaded()
+                }
+            }
+            .addOnFailureListener { e ->
+                println("FIREBASE: Failed to get profile details: ${e.message}")
+            }
+    }
+
+    fun updateProfileDetails(myUid: String) {
+        val profileData = mapOf(
+            "username" to profileUsername,
+            "aboutMe" to aboutMe,
+            "profilePictureUrl" to profilePictureUrl
+        )
+
+        db.collection("users").document(myUid)
+            .set(profileData, com.google.firebase.firestore.SetOptions.merge())
+            .addOnSuccessListener {
+                println("FIREBASE: Profile details updated")
+            }
+            .addOnFailureListener { e ->
+                println("FIREBASE: Failed to update profile details: ${e.message}")
+            }
+    }
 }
+
+
