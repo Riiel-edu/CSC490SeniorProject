@@ -1,18 +1,22 @@
 package com.example.csc490seniorproject.viewmodels
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.csc490seniorproject.audio.HighQualityPlaybackEngine
+import com.example.csc490seniorproject.data.saveSong
 import com.example.csc490seniorproject.objects.Instrument
 import com.example.csc490seniorproject.objects.Note
 import com.example.csc490seniorproject.objects.Song
 import com.example.csc490seniorproject.objects.Track
 import com.example.csc490seniorproject.objects.newSong
 import com.example.csc490seniorproject.objects.totalSteps
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -230,4 +234,30 @@ class EditorScreenVM(application: Application) : AndroidViewModel(application) {
 
     private fun Song.withTrack(trackId: String, transform: (Track) -> Track): Song =
         copy(tracks = tracks.map { if (it.id == trackId) transform(it) else it })
+
+    private val _saveStatus = MutableStateFlow<String?>(null)
+    val saveStatus = _saveStatus.asStateFlow()
+
+    fun saveCurrentSong() {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        Log.d("SongSave", "clicked, uid=$uid, songId=${song.value.id}")
+        if (uid == null) { _saveStatus.value = "Not signed in"; return }
+        try {
+            saveSong(
+                uid = uid,
+                song = song.value,
+                onSuccess = { id ->
+                    Log.d("SongSave", "saved $id")
+                    _song.update { it.copy(id = id) }
+                    _saveStatus.value = "Saved"
+                },
+                onFailure = {
+                    Log.e("SongSave", "failed", it)
+                    _saveStatus.value = "Save failed: ${it.message}"
+                }
+            )
+        } catch (e: Exception) {
+            Log.e("SongSave", "threw before sending", e)
+        }
+    }
 }
