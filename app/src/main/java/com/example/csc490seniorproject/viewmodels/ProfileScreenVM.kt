@@ -107,15 +107,28 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
     }
 
     fun getFriends(uid: String) {
+        println("friends: getFriends() called with uid = $uid")
         friendsList.clear()
-        db.collection("users").document(uid).collection("friends").get()
-            .addOnSuccessListener { snapshot ->
-                for (doc in snapshot.documents) {
-                    val friendUid = doc.id
+
+        db.collection("users").document(uid).get()
+            .addOnSuccessListener { document ->
+                if (!document.exists()) {
+                    println("friends: User document does not exist")
+                    return@addOnSuccessListener
+                }
+
+                val friendUids = document.get("friends") as? List<String> ?: emptyList()
+
+                println("friends: Found ${friendUids.size} friend UIDs")
+                println("friends: Friend UIDs = $friendUids")
+
+                for (friendUid in friendUids) {
+                    println("friends: Loading friend UID = $friendUid")
+
                     db.collection("users").document(friendUid).get()
                         .addOnSuccessListener { friendDocument ->
                             if (friendDocument.exists()) {
-                                friendsList.add(User(
+                                val friend = User(
                                     username = friendDocument.getString("username") ?: "",
                                     first_name = friendDocument.getString("first_name") ?: "",
                                     last_name = friendDocument.getString("last_name") ?: "",
@@ -125,12 +138,24 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
                                     songs = arrayListOf(),
                                     friends = arrayListOf(),
                                     uid = friendUid
-                                ))
+                                )
+
+                                friendsList.add(friend)
+
+                                println("friends: Added ${friend.username}")
+                                println("friends: Current friendsList size = ${friendsList.size}")
+                            } else {
+                                println("friends: User document not found for UID = $friendUid")
                             }
+                        }
+                        .addOnFailureListener { e ->
+                            println("friends: Failed to load $friendUid: ${e.message}")
                         }
                 }
             }
-            .addOnFailureListener { friendsList.clear() }
+            .addOnFailureListener { e ->
+                println("friends: Failed to load user's friends: ${e.message}")
+            }
     }
 
     fun checkFriendStatus(myUid: String, otherUid: String) {
@@ -211,11 +236,39 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
         db.collection("users").document(myUid).get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
-                    profileUsername = document.getString("username") ?: ""
+                    val displayName = document.getString("displayName")
+                    val username = document.getString("username") ?: ""
+
+                    // Use displayName if it exists; otherwise use username
+                    profileUsername = if (displayName.isNullOrBlank()) {
+                        username
+                    } else {
+                        displayName
+                    }
+
                     aboutMe = document.getString("aboutMe") ?: ""
                     profilePictureUrl = document.getString("profilePictureUrl") ?: ""
 
-                    onLoaded()
+                    if (displayName.isNullOrBlank()) {
+                        db.collection("users").document(myUid)
+                            .set(
+                                mapOf("displayName" to username),
+                                com.google.firebase.firestore.SetOptions.merge()
+                            )
+                            .addOnSuccessListener {
+                                println("FIREBASE: Created displayName = $username")
+                                onLoaded()
+                            }
+                            .addOnFailureListener { e ->
+                                println("FIREBASE: Failed to create displayName: ${e.message}")
+                                onLoaded()
+                            }
+                    } else {
+                        println("FIREBASE: Loaded displayName = $displayName")
+                        onLoaded()
+                    }
+                } else {
+                    println("FIREBASE: User document does not exist")
                 }
             }
             .addOnFailureListener { e ->
@@ -225,7 +278,7 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
 
     fun updateProfileDetails(myUid: String) {
         val profileData = mapOf(
-            "username" to profileUsername,
+            "displayName" to profileUsername,
             "aboutMe" to aboutMe,
             "profilePictureUrl" to profilePictureUrl
         )
@@ -233,10 +286,10 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
         db.collection("users").document(myUid)
             .set(profileData, com.google.firebase.firestore.SetOptions.merge())
             .addOnSuccessListener {
-                println("FIREBASE: Profile details updated")
+                println("FIREBASE: Profile details updated or created successfully")
             }
             .addOnFailureListener { e ->
-                println("FIREBASE: Failed to update profile details: ${e.message}")
+                println("FIREBASE: Failed to save profile details: ${e.message}")
             }
     }
 }
