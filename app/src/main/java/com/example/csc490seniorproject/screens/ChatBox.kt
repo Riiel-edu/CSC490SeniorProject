@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,9 +62,9 @@ fun ChatBox(modifier: Modifier = Modifier, friendUsernames: List<String> = empty
         var selectedName by rememberSaveable { mutableStateOf("") }
         var search by rememberSaveable { mutableStateOf("") }
         var draft by rememberSaveable(selectedUid) { mutableStateOf("") }
+        var searchFocused by remember { mutableStateOf(false) }
 
         var loading by remember { mutableStateOf(true) }
-        var finding by remember { mutableStateOf(false) }
         var sending by remember { mutableStateOf(false) }
         var error by remember { mutableStateOf("") }
         val listState = rememberLazyListState()
@@ -206,72 +207,34 @@ fun ChatBox(modifier: Modifier = Modifier, friendUsernames: List<String> = empty
                         },
                         singleLine = true,
                         shape = RoundedCornerShape(24.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { searchFocused = it.isFocused }
                     )
 
-                    // Search can also find someone you haven't messaged yet.
-                    if (search.isNotBlank()) {
-                        TextButton(
-                            enabled = !finding,
-                            onClick = {
-                                finding = true
-                                error = ""
-                                val name = search.trim()
+                    Spacer(Modifier.height(10.dp))
 
-                                db.collection("users")
-                                    .whereEqualTo("username", name)
-                                    .limit(2)
-                                    .get()
-                                    .addOnSuccessListener { result ->
-                                        finding = false
-                                        if (auth.currentUser?.uid == uid) {
-                                            when {
-                                                result.isEmpty ->
-                                                    error = "Username not found."
+                    // Conversations you already have — always visible, filtered by search text.
+                    val conversationIds = conversations.keys.filter { peerId ->
+                        search.isBlank() ||
+                                people[peerId]?.username
+                                    ?.contains(search.trim(), ignoreCase = true) == true
+                    }.sortedWith(
+                        compareByDescending<String> {
+                            conversations[it]?.lastOrNull()?.time ?: 0L
+                        }.thenBy { people[it]?.username.orEmpty() }
+                    )
 
-                                                result.documents.size > 1 ->
-                                                    error = "Multiple accounts use this username."
-
-                                                result.documents.first().id == uid ->
-                                                    error = "Choose another person's username."
-
-                                                else -> {
-                                                    val document = result.documents.first()
-                                                    val person = MessengerPerson(
-                                                        document.id,
-                                                        document.getString("username") ?: name
-                                                    )
-                                                    people[person.uid] = person
-                                                    openPerson(person)
-                                                }
-                                            }
-                                        }
-                                    }
-                                    .addOnFailureListener {
-                                        finding = false
-                                        error = it.localizedMessage ?: "Search failed."
-                                    }
-                            }
-                        ) {
-                            Text(
-                                if (finding) "Searching…"
-                                else "Find exact username",
-                                color = ChatPurple
-                            )
-                        }
-                    }
-
-                    val visibleIds = (
-                            conversations.keys + friendIds
-                            ).distinct().filter { peerId ->
+                    // Friends you don't have a conversation with yet — only shown while
+                    // the search bar is focused or you're typing, as a picker to start a new chat.
+                    val friendPickerIds = friendIds.filter { it !in conversations.keys }
+                        .filter { peerId ->
                             search.isBlank() ||
                                     people[peerId]?.username
                                         ?.contains(search.trim(), ignoreCase = true) == true
-                        }.sortedWith(
-                            compareByDescending<String> {
-                                conversations[it]?.lastOrNull()?.time ?: 0L
-                            }.thenBy { people[it]?.username.orEmpty() }
-                        )
+                        }.sortedBy { people[it]?.username.orEmpty() }
+
+                    val showPicker = searchFocused || search.isNotBlank()
 
                     LazyColumn(
                         modifier = Modifier
@@ -279,12 +242,56 @@ fun ChatBox(modifier: Modifier = Modifier, friendUsernames: List<String> = empty
                             .heightIn(max = 420.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (visibleIds.isEmpty()) {
+                        if (showPicker && friendPickerIds.isNotEmpty()) {
+                            item {
+                                Text(
+                                    "Friends",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+                            items(friendPickerIds, key = { "friend_$it" }) { peerId ->
+                                val person = people[peerId]
+                                Surface(
+                                    onClick = {
+                                        person?.let { openPerson(it) }
+                                    },
+                                    enabled = person != null,
+                                    color = Color.White,
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        ChatAvatar(person?.username ?: "?")
+                                        Text(
+                                            person?.username ?: "Loading profile…",
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(
+                                            "Tap to start chatting",
+                                            color = Color.Gray,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                            }
+                            item { Spacer(Modifier.height(4.dp)) }
+                        }
+
+                        if (conversationIds.isEmpty() && !(showPicker && friendPickerIds.isNotEmpty())) {
                             item {
                                 Text(
                                     when {
                                         loading -> "Loading conversations…"
-                                        search.isNotBlank() -> "No matching chats. Try exact username search."
+                                        search.isNotBlank() -> "No matching chats."
                                         else -> "Your conversations appear here after you send or receive a message."
                                     },
                                     color = Color.Gray,
@@ -293,7 +300,7 @@ fun ChatBox(modifier: Modifier = Modifier, friendUsernames: List<String> = empty
                             }
                         }
 
-                        items(visibleIds, key = { it }) { peerId ->
+                        items(conversationIds, key = { "conv_$it" }) { peerId ->
                             val person = people[peerId]
                             val lastMessage = conversations[peerId]?.lastOrNull()
 
