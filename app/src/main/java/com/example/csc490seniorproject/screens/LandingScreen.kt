@@ -109,7 +109,7 @@ fun LandingScreen(viewModel: LandingScreenVM, navController: NavController, user
                     ) {
                         Button(
                             onClick = {
-                                navController.navigate("BeatmapEditorScreen")
+                                navController.navigate("MySongsScreen")
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF5d36eb),

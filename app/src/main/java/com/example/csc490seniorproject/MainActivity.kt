@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
                         title = "Create",
                         iconSelected = Icons.Filled.Add,
                         iconUnselected = Icons.Outlined.Add,
-                        route = "EditorScreen"
+                        route = "MySongsScreen"
                     ),
                     NavItem(
                         title = "Profile",
