@@ -124,6 +124,20 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
 
     LaunchedEffect(username, currentUid) {
         viewModel.loadProfile(username, currentUid)
+
+        currentUid?.let { uid ->
+            viewModel.getProfileDetails(uid) {
+                aboutMe = viewModel.aboutMe
+                editableUsername = viewModel.profileUsername
+                profilePictureUri = if (viewModel.profilePictureUrl.isNotBlank()) {
+                    Uri.parse(viewModel.profilePictureUrl)
+                } else {
+                    null
+                }
+            }
+        }
+
+
     }
 
     val profileUid = viewModel.profileUid
@@ -310,7 +324,32 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                         currentUid == profileUid
                     ) {
                         Button(
-                            onClick = { isEditing = !isEditing},
+                            onClick = {
+                                if (isEditing) {
+                                    viewModel.profileUsername = editableUsername
+                                    viewModel.aboutMe = aboutMe
+                                    viewModel.profilePictureUrl = profilePictureUri?.toString() ?: ""
+
+                                    profileUid?.let { uid ->
+                                        viewModel.updateProfileDetails(uid)
+                                    }
+                                } else {
+                                    profileUid?.let { uid ->
+                                        viewModel.getProfileDetails(uid){
+                                            aboutMe = viewModel.aboutMe
+                                            editableUsername = viewModel.profileUsername
+                                            profilePictureUri = if (viewModel.profilePictureUrl.isNotBlank()) {
+                                                Uri.parse(viewModel.profilePictureUrl)
+                                            } else {
+                                                null
+                                            }
+                                        }
+
+                                    }
+
+                                }
+                                isEditing = !isEditing
+                                      },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = ProfilePurple
                             )
