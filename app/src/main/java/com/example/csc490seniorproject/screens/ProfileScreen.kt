@@ -151,6 +151,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
         mutableStateListOf<Song>()
     }
 
+
     val descriptions = remember(username, currentUid) {
         mutableStateMapOf<String, String>()
     }
@@ -638,7 +639,9 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
 
                 items(
                     items = friendsList,
-                    key = { it.uid }
+                    key = { friend ->
+                        friend.uid.ifBlank { friend.username }
+                    }
                 ) { friend ->
                     Surface(
                         color = ProfileCardPurple,
