@@ -1,5 +1,6 @@
 package com.example.csc490seniorproject.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,18 +19,23 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,6 +43,9 @@ import androidx.navigation.NavController
 import com.example.csc490seniorproject.R
 import com.example.csc490seniorproject.viewmodels.SearchScreenVM
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import java.util.Locale
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 @Composable
@@ -48,7 +57,7 @@ fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
     var text by rememberSaveable { mutableStateOf("") }
 
     val visibleSongs = if (text.isBlank()) {
-        emptyList()
+        viewModel.songsList
     } else {
         viewModel.songsList.filter { song ->
             song.name.contains(text.trim(), ignoreCase = true)
@@ -67,7 +76,7 @@ fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
                 text = query
                 viewModel.searchUsers(query)
             },
-            label = { Text("Search songs or users") },
+            label = { Text("Search songs, or users") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
@@ -159,6 +168,42 @@ fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
                 items = visibleSongs,
                 key = { "song_${it.id}" }
             ) { song ->
+
+                var liveRating by remember(song.id) {
+                    mutableStateOf(song.rating.coerceIn(0.0, 5.0))
+                }
+
+                var ratingCount by remember(song.id) {
+                    mutableIntStateOf(0)
+                }
+
+                DisposableEffect(song.id) {
+                    val listener = FirebaseFirestore.getInstance()
+                        .collection("songs")
+                        .document(song.id)
+                        .collection("ratings")
+                        .addSnapshotListener { snapshot, error ->
+                            if (error == null && snapshot != null) {
+                                val ratings = snapshot.documents.mapNotNull { doc ->
+                                    (doc.get("rating") as? Number)
+                                        ?.toInt()
+                                        ?.takeIf { it in 1..5 }
+                                }
+
+                                ratingCount = ratings.size
+                                liveRating = if (ratings.isNotEmpty()) {
+                                    ratings.average()
+                                } else {
+                                    0.0
+                                }
+                            }
+                        }
+
+                    onDispose {
+                        listener.remove()
+                    }
+                }
+
                 Surface(
                     color = cardPurple,
                     shape = RoundedCornerShape(12.dp),
@@ -170,27 +215,32 @@ fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Surface(
-                                shape = RoundedCornerShape(10.dp)
+                                shadowElevation = 8.dp,
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(2.dp, Color.Black)
                             ) {
                                 Image(
-
                                     painter = painterResource(id = R.drawable.default_pfp),
-
-
-                                    contentDescription = "Song artwork",
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(80.dp)
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(90.dp)
+                                        .clip(RoundedCornerShape(8.dp))
                                 )
                             }
 
                             Column(
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
+
                                 Text(
                                     text = song.name,
                                     fontFamily = fredoka,
@@ -200,32 +250,48 @@ fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
                                     overflow = TextOverflow.Ellipsis
                                 )
 
-                                val stars = song.rating
-                                    .coerceIn(0.0, 5.0)
-                                    .roundToInt()
+                                val stars = floor(liveRating + 0.5)
+                                    .toInt()
+                                    .coerceIn(0, 5)
 
                                 Text(
-                                    text = if (song.rating <= 0.0) {
+                                    text = if (ratingCount == 0) {
                                         "No ratings yet"
                                     } else {
                                         "★".repeat(stars) +
-                                                "☆".repeat(5 - stars)
+                                                "☆".repeat(5 - stars) +
+                                                "  " + String.format(
+                                            Locale.US,
+                                            "%.1f/5.0",
+                                            liveRating
+                                        )
                                     },
                                     fontFamily = fredoka,
                                     color = purple
                                 )
 
-                                Text(
-                                    text = "${song.bpm} BPM",
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    shadowElevation = 4.dp,
                                     color = Color.White,
-                                    fontSize = 13.sp
-                                )
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        "Description",
+                                        fontFamily = fredoka,
+                                        fontSize = 13.sp,
+                                        color = Color(0xFF444444),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(8.dp)
+                                    )
+                                }
                             }
                         }
 
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             // Playback is not connected yet.
                             OutlinedButton(
@@ -233,7 +299,12 @@ fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
                                 enabled = false,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("Listen")
+                                Text(
+                                    "Listen \uD83D\uDD0A",
+                                    fontFamily = fredoka,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
 
                             Button(
@@ -242,11 +313,15 @@ fun SearchScreen(viewModel: SearchScreenVM, navController: NavController) {
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = purple
                                 ),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1.6f)
                             ) {
                                 Text(
-                                    text = "More details",
-                                    maxLines = 1
+                                    "More details ☰",
+                                    fontFamily = fredoka,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             }
                         }
