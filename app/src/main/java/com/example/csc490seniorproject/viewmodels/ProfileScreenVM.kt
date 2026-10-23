@@ -247,7 +247,14 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
                     }
 
                     aboutMe = document.getString("aboutMe") ?: ""
-                    profilePictureUrl = document.getString("profilePictureUrl") ?: ""
+
+                    // Load the saved profile picture URL
+                    val savedPictureUrl =
+                        document.getString("profilePictureUrl") ?: ""
+
+                    profilePictureUrl = savedPictureUrl
+
+                    println("PROFILE: Loaded picture URI = $profilePictureUrl")
 
                     if (displayName.isNullOrBlank()) {
                         db.collection("users").document(myUid)
@@ -269,13 +276,14 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
                     }
                 } else {
                     println("FIREBASE: User document does not exist")
+                    onLoaded()
                 }
             }
             .addOnFailureListener { e ->
                 println("FIREBASE: Failed to get profile details: ${e.message}")
+                onLoaded()
             }
     }
-
     fun updateProfileDetails(myUid: String) {
         val profileData = mapOf(
             "displayName" to profileUsername,

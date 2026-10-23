@@ -59,6 +59,7 @@ import com.example.csc490seniorproject.objects.Song
 import com.google.firebase.firestore.FirebaseFirestore
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -70,7 +71,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import java.util.Locale
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-
+import com.google.firebase.storage.FirebaseStorage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
@@ -90,13 +91,16 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
         mutableStateOf<Uri?>(null)
     }
 
+
     val imagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
             profilePictureUri = uri
+            println("Selected image URI: $uri")
         }
     }
+
     val auth = remember { FirebaseAuth.getInstance() }
     val db = remember { FirebaseFirestore.getInstance() }
     val fredoka = remember {
@@ -235,7 +239,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
+        item{
             HorizontalDivider(
                 color = Color.White,
                 thickness = 2.dp
@@ -258,7 +262,11 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                             .fillMaxSize()
                             .clip(CircleShape)
                             .clickable(enabled = isEditing) {
-                                imagePicker.launch("image/*")
+                                imagePicker.launch(
+                                    PickVisualMediaRequest(
+                                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                                    )
+                                )
                             }
                     ) {
                         if (profilePictureUri != null) {
