@@ -34,6 +34,7 @@ import com.example.csc490seniorproject.viewmodels.BeatmapEditorVM
 import com.example.csc490seniorproject.viewmodels.GameVM
 
 import com.example.csc490seniorproject.viewmodels.ProfileScreenVM
+import com.example.csc490seniorproject.viewmodels.SongScreenVM
 import com.example.csc490seniorproject.viewmodels.WorkspaceViewModel
 import com.google.firebase.auth.FirebaseAuth
 
@@ -48,6 +49,7 @@ fun Nav(
     val landingScreenVM = viewModel { LandingScreenVM(app) }
     val searchScreenVM = viewModel { SearchScreenVM(app) }
     val profileScreenVM = viewModel { ProfileScreenVM(app) }
+    val songScreenVM = viewModel { SongScreenVM(app) }
     var currentUsername by rememberSaveable {
         mutableStateOf("Username")
     }
@@ -103,12 +105,12 @@ fun Nav(
         }
 
         composable(route = "SongScreen") {
-            SongScreen(landingScreenVM)
+            SongScreen(songScreenVM)
         }
 
         composable("SongScreen/{songId}") { entry ->
             SongScreen(
-                viewModel = landingScreenVM,
+                viewModel = songScreenVM,
                 songId = entry.arguments?.getString("songId").orEmpty()
             )
         }
