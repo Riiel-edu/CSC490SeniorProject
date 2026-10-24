@@ -248,9 +248,8 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
 
                     aboutMe = document.getString("aboutMe") ?: ""
 
-                    // Load the saved profile picture URL
-                    val savedPictureUrl =
-                        document.getString("profilePictureUrl") ?: ""
+
+                    val savedPictureUrl = document.getString("profilePictureUrl") ?: ""
 
                     profilePictureUrl = savedPictureUrl
 

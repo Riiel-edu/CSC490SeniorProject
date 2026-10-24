@@ -89,13 +89,11 @@ fun TopBar(navController: NavHostController) {
             IconButton(
                 onClick = {
                     navController.navigate("ProfileScreen") {
-                        launchSingleTop = true
-                        restoreState = true
-                        popUpTo(
-                            navController.graph.findStartDestination().id
-                        ) {
-                            saveState = true
+                        popUpTo(navController.graph.id) {
+                            inclusive = true
                         }
+                        launchSingleTop = true
+                        restoreState = false
                     }
                 }) {
                 Icon(

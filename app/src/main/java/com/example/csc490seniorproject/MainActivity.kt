@@ -127,6 +127,12 @@ class MainActivity : ComponentActivity() {
                                                     saveState = true
                                                 }
                                             }
+                                            if (item.route == "ProfileScreen") {
+                                                navHostController.popBackStack(
+                                                    route = "ProfileScreen",
+                                                    inclusive = false
+                                                )
+                                            }
                                         },
                                         label = {
                                             Text(item.title)

@@ -25,6 +25,7 @@ import com.example.csc490seniorproject.viewmodels.EditorScreenVM
 import com.example.csc490seniorproject.screens.RegisterScreen
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.csc490seniorproject.screens.BeatmapEditorScreen
 import com.example.csc490seniorproject.screens.EditorScreen
 import com.example.csc490seniorproject.screens.GameScreen
@@ -116,10 +117,25 @@ fun Nav(
         }
 
         composable(route = "ProfileScreen") {
+
             ProfileScreen(
                 viewModel = profileScreenVM,
                 navController = navController,
-                username = currentUsername
+                username = currentUsername,
+                profileID = null
+            )
+        }
+
+
+        composable(route = "ProfileScreen/{uid}/{username}") { backStackEntry ->
+            val uid = backStackEntry.arguments?.getString("uid")
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+
+            ProfileScreen(
+                viewModel = profileScreenVM,
+                navController = navController,
+                username = username,
+                profileID = uid
             )
         }
 

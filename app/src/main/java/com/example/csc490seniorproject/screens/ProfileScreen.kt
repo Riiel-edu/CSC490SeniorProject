@@ -77,7 +77,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
 private enum class ProfileTab { SONGS, FRIENDS, CHATS }
 @Composable
-fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, username: String) {
+fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, username: String,profileID: String? = null) {
     var isEditing by remember(username) {
         mutableStateOf(false)
     }
@@ -107,44 +107,50 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
         FontFamily(Font(R.font.fredoka_medium, FontWeight.Normal))
     }
 
-    var currentUid by remember {
-        mutableStateOf(auth.currentUser?.uid)
+    var currentUid by remember() {
+        mutableStateOf( auth.currentUser?.uid)
     }
+
+
 
     val ProfilePurple = Color(0xFF5D36EB)
     val ProfileCardPurple = Color(0xFFBFB1FA)
 
-    DisposableEffect(auth) {
+    DisposableEffect(auth, profileID) {
         val listener = FirebaseAuth.AuthStateListener {
             currentUid = it.currentUser?.uid
+        }.also {
+            auth.addAuthStateListener(it)
         }
-
-        auth.addAuthStateListener(listener)
 
         onDispose {
-            auth.removeAuthStateListener(listener)
+            listener?.let {
+                auth.removeAuthStateListener(it)
+            }
         }
     }
+    val profileUid = profileID ?: viewModel.profileUid
 
     LaunchedEffect(username, currentUid) {
         viewModel.loadProfile(username, currentUid)
 
-        currentUid?.let { uid ->
-            viewModel.getProfileDetails(uid) {
+        val uid = if (profileID == profileUid) profileID else currentUid
+
+        uid?.let { profileUid ->
+            viewModel.getProfileDetails(profileUid) {
                 aboutMe = viewModel.aboutMe
                 editableUsername = viewModel.profileUsername
-                profilePictureUri = if (viewModel.profilePictureUrl.isNotBlank()) {
-                    Uri.parse(viewModel.profilePictureUrl)
-                } else {
-                    null
-                }
+                profilePictureUri =
+                    if (viewModel.profilePictureUrl.isNotBlank()) {
+                        Uri.parse(viewModel.profilePictureUrl)
+                    } else {
+                        null
+                    }
             }
         }
-
-
     }
 
-    val profileUid = viewModel.profileUid
+
     val friendsList = viewModel.friendsList
 
     var selectedTab by remember(username, currentUid) {
@@ -368,6 +374,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                     } else if (
                         currentUid != null && profileUid != null
                     ) {
+
                         val myUid = currentUid
                         val targetUid = profileUid
 
@@ -703,7 +710,9 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                             Spacer(Modifier.height(12.dp))
 
                             Button(
-                                onClick = { },
+                                onClick = {
+                                    navController.navigate("ProfileScreen/${friend.uid}/${friend.username}")
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = ProfilePurple
                                 ),
