@@ -217,19 +217,18 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                 }
             },
             title = {
-                Text("Rate this song")
+                Text("Rate this song", color = Color(0xFF5D36EB), fontFamily = fredoka)
             },
             text = {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        if (selectedRating == 0) {
-                            "Select 1 to 5 stars"
-                        } else {
-                            "$selectedRating out of 5 stars"
-                        }
+
+                    HorizontalDivider(
+                        color = Color(0xFF5D36EB),
+                        modifier = Modifier.fillMaxWidth(),
+                        thickness = 2.dp
                     )
 
                     Row(
@@ -258,6 +257,14 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                         }
                     }
 
+                    Text(
+                        if (selectedRating == 0) {
+                            "Select 1 to 5 stars"
+                        } else {
+                            "$selectedRating out of 5 stars"
+                        }
+                    )
+
                     ratingError?.let { message ->
                         Text(
                             text = message,
@@ -268,14 +275,15 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                 }
             },
             confirmButton = {
-                TextButton(
+                Button(
                     enabled = selectedRating in 1..5 && !savingRating,
+                    colors = ButtonDefaults.buttonColors(containerColor = purple),
                     onClick = {
                         val uid = auth.currentUser?.uid
 
                         if (uid == null) {
                             ratingError = "Please log in first."
-                            return@TextButton
+                            return@Button
                         }
 
                         savingRating = true

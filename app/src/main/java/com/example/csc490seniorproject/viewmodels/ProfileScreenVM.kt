@@ -42,7 +42,7 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
                 DoB = "1/1/2020",
                 email = "email@mmm",
                 songs = songsList,
-                friends = friendsList
+                friends = friendsList,
             ))
             friendsList.add(User(
                 username = "Username2",

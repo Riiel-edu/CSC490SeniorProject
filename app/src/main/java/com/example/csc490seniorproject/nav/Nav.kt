@@ -126,7 +126,7 @@ fun Nav(
         composable(route = "SearchScreen") {
             SearchScreen(
                 viewModel = searchScreenVM,
-                navController = navController
+                navController = navController,
             )
         }
 
