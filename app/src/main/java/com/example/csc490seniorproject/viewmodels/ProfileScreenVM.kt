@@ -14,7 +14,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlin.collections.set
 import kotlin.text.get
-
+import android.net.Uri
+import com.google.firebase.storage.FirebaseStorage
 enum class FriendStatus { NONE, REQUEST_SENT, REQUEST_RECEIVED, FRIENDS }
 
 class ProfileScreenVM(application: Application) : AndroidViewModel(application) {
@@ -232,14 +233,23 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
             }
     }
 
+
     fun getProfileDetails(myUid: String, onLoaded: () -> Unit = {}) {
+        println("PROFILE: getProfileDetails() called")
+        println("PROFILE: myUid = $myUid")
+
         db.collection("users").document(myUid).get()
             .addOnSuccessListener { document ->
+                println("FIREBASE: User document retrieved successfully")
+                println("FIREBASE: Document exists = ${document.exists()}")
+
                 if (document.exists()) {
                     val displayName = document.getString("displayName")
                     val username = document.getString("username") ?: ""
 
-                    // Use displayName if it exists; otherwise use username
+                    println("PROFILE: Firestore displayName = $displayName")
+                    println("PROFILE: Firestore username = $username")
+
                     profileUsername = if (displayName.isNullOrBlank()) {
                         username
                     } else {
@@ -248,14 +258,21 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
 
                     aboutMe = document.getString("aboutMe") ?: ""
 
+                    val savedPictureUrl =
+                        document.getString("profilePictureUrl") ?: ""
 
-                    val savedPictureUrl = document.getString("profilePictureUrl") ?: ""
+                    println("PROFILE: Raw profilePictureUrl = $savedPictureUrl")
+                    println("PROFILE: Picture URL is blank = ${savedPictureUrl.isBlank()}")
+                    println("PROFILE: Is content URI = ${savedPictureUrl.startsWith("content://")}")
+                    println("PROFILE: Is HTTP URL = ${savedPictureUrl.startsWith("http://") || savedPictureUrl.startsWith("https://")}")
 
                     profilePictureUrl = savedPictureUrl
 
-                    println("PROFILE: Loaded picture URI = $profilePictureUrl")
+                    println("PROFILE: Assigned profilePictureUrl = $profilePictureUrl")
 
                     if (displayName.isNullOrBlank()) {
+                        println("FIREBASE: displayName is blank; updating it")
+
                         db.collection("users").document(myUid)
                             .set(
                                 mapOf("displayName" to username),
@@ -267,6 +284,7 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
                             }
                             .addOnFailureListener { e ->
                                 println("FIREBASE: Failed to create displayName: ${e.message}")
+                                e.printStackTrace()
                                 onLoaded()
                             }
                     } else {
@@ -274,15 +292,55 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
                         onLoaded()
                     }
                 } else {
-                    println("FIREBASE: User document does not exist")
+                    println("FIREBASE: User document does not exist for UID = $myUid")
                     onLoaded()
                 }
             }
             .addOnFailureListener { e ->
                 println("FIREBASE: Failed to get profile details: ${e.message}")
+                e.printStackTrace()
                 onLoaded()
             }
     }
+
+    fun uploadProfilePicture(uid: String, imageUri: Uri) {
+        println("PROFILE: Starting image upload: $imageUri")
+
+        val imageRef = FirebaseStorage.getInstance()
+            .reference
+            .child("profilePictures/$uid.jpg")
+
+        imageRef.putFile(imageUri)
+            .addOnSuccessListener {
+                println("PROFILE: Image uploaded successfully")
+
+                imageRef.downloadUrl
+                    .addOnSuccessListener { downloadUri ->
+                        val url = downloadUri.toString()
+
+                        println("PROFILE: Generated download URL = $url")
+
+                        db.collection("users")
+                            .document(uid)
+                            .update("profilePictureUrl", url)
+                            .addOnSuccessListener {
+                                profilePictureUrl = url
+                                println("PROFILE: Download URL saved successfully")
+                            }
+                            .addOnFailureListener { e ->
+                                println("PROFILE: Failed to save URL: ${e.message}")
+                            }
+                    }
+                    .addOnFailureListener { e ->
+                        println("PROFILE: Failed to get download URL: ${e.message}")
+                    }
+            }
+            .addOnFailureListener { e ->
+                println("PROFILE: Image upload failed: ${e.message}")
+                e.printStackTrace()
+            }
+    }
+
     fun updateProfileDetails(myUid: String) {
         val profileData = mapOf(
             "displayName" to profileUsername,

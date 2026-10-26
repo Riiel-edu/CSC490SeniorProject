@@ -92,14 +92,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
     }
 
 
-    val imagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            profilePictureUri = uri
-            println("Selected image URI: $uri")
-        }
-    }
+
 
     val auth = remember { FirebaseAuth.getInstance() }
     val db = remember { FirebaseFirestore.getInstance() }
@@ -150,6 +143,28 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
         }
     }
 
+
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            profilePictureUri = uri
+            println("PROFILE: Selected image URI = $uri")
+
+            val uid = currentUid
+
+            if (uid != null) {
+                viewModel.uploadProfilePicture(
+                    uid = uid,
+                    imageUri = uri
+                )
+            } else {
+                println("PROFILE: Cannot upload image; currentUid is null")
+            }
+        } else {
+            println("PROFILE: No image selected")
+        }
+    }
 
     val friendsList = viewModel.friendsList
 
