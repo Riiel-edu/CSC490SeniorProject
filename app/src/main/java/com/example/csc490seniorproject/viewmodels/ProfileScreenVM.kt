@@ -111,14 +111,9 @@ class ProfileScreenVM(application: Application) : AndroidViewModel(application) 
         println("friends: getFriends() called with uid = $uid")
         friendsList.clear()
 
-        db.collection("users").document(uid).get()
-            .addOnSuccessListener { document ->
-                if (!document.exists()) {
-                    println("friends: User document does not exist")
-                    return@addOnSuccessListener
-                }
-
-                val friendUids = document.get("friends") as? List<String> ?: emptyList()
+        db.collection("users").document(uid).collection("friends").get()
+            .addOnSuccessListener { snapshot ->
+                val friendUids = snapshot.documents.map { it.id }
 
                 println("friends: Found ${friendUids.size} friend UIDs")
                 println("friends: Friend UIDs = $friendUids")
