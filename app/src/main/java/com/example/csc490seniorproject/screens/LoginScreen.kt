@@ -30,16 +30,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.csc490seniorproject.data.UserSession
 import com.example.csc490seniorproject.data.getUserProfile
 import com.example.csc490seniorproject.data.getEmailForUsername
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen( onLoginSuccess: (String) -> Unit, onRegisterClick: () -> Unit) {
+
+    val context = LocalContext.current
+    val userSession = remember { UserSession(context) }
+    val scope = rememberCoroutineScope()
 
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -169,7 +177,12 @@ fun LoginScreen( onLoginSuccess: (String) -> Unit, onRegisterClick: () -> Unit) 
                                     val uid = authResult.user!!.uid
                                     getUserProfile(
                                         uid = uid,
-                                        onSuccess = { profile -> onLoginSuccess(profile.username) },
+                                        onSuccess = { profile ->
+                                            scope.launch {
+                                                userSession.saveSession(uid, profile.username)
+                                                onLoginSuccess(profile.username)
+                                            }
+                                        },
                                         onFailure = { e ->
                                             errorMessage = "Logged in, but couldn't load profile: ${e.localizedMessage}"
                                         }

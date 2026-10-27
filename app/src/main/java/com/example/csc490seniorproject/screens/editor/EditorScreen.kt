@@ -47,6 +47,7 @@ fun EditorScreen(viewModel: EditorScreenVM, navController: NavController, modifi
     val currentStep by viewModel.currentStep.collectAsState()
     val noteLengthSteps by viewModel.noteLengthSteps.collectAsState()
     val activeOctaveByTrack by viewModel.activeOctaveByTrack.collectAsState()
+    val saveStatus by viewModel.saveStatus.collectAsState()
 
     val workspaceViewModel: WorkspaceViewModel = viewModel(LocalContext.current as ComponentActivity)
 
@@ -67,6 +68,12 @@ fun EditorScreen(viewModel: EditorScreenVM, navController: NavController, modifi
             ) {
                 Text(text = "\uD83C\uDFAE Beatmap Editor", fontFamily = fredoka)
             }
+
+            Button(
+                onClick = { viewModel.saveCurrentSong() },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2e9e5b), contentColor = Color.White),
+                shape = RoundedCornerShape(10.dp)
+            ) { Text("\uD83D\uDCBE Save", fontFamily = fredoka) }
         }
 
         Spacer(modifier = Modifier.height(10.dp))

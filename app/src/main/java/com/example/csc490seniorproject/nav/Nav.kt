@@ -25,6 +25,7 @@ import com.example.csc490seniorproject.viewmodels.EditorScreenVM
 import com.example.csc490seniorproject.screens.RegisterScreen
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.csc490seniorproject.screens.BeatmapEditorScreen
 import com.example.csc490seniorproject.screens.EditorScreen
 import com.example.csc490seniorproject.screens.GameScreen
@@ -34,6 +35,7 @@ import com.example.csc490seniorproject.viewmodels.BeatmapEditorVM
 import com.example.csc490seniorproject.viewmodels.GameVM
 
 import com.example.csc490seniorproject.viewmodels.ProfileScreenVM
+import com.example.csc490seniorproject.viewmodels.SongScreenVM
 import com.example.csc490seniorproject.viewmodels.WorkspaceViewModel
 import com.google.firebase.auth.FirebaseAuth
 
@@ -48,13 +50,15 @@ fun Nav(
     val landingScreenVM = viewModel { LandingScreenVM(app) }
     val searchScreenVM = viewModel { SearchScreenVM(app) }
     val profileScreenVM = viewModel { ProfileScreenVM(app) }
+    val songScreenVM = viewModel { SongScreenVM(app) }
     var currentUsername by rememberSaveable {
         mutableStateOf("Username")
     }
 
     NavHost(
         navController = navController,
-        startDestination = "LoginScreen",
+        startDestination =
+            if (FirebaseAuth.getInstance().currentUser != null) "LandingScreen" else "LoginScreen",
         modifier = modifier
     ) {
 
@@ -102,28 +106,43 @@ fun Nav(
         }
 
         composable(route = "SongScreen") {
-            SongScreen(landingScreenVM)
+            SongScreen(songScreenVM)
         }
 
         composable("SongScreen/{songId}") { entry ->
             SongScreen(
-                viewModel = landingScreenVM,
+                viewModel = songScreenVM,
                 songId = entry.arguments?.getString("songId").orEmpty()
             )
         }
 
         composable(route = "ProfileScreen") {
+
             ProfileScreen(
                 viewModel = profileScreenVM,
                 navController = navController,
-                username = currentUsername
+                username = currentUsername,
+                profileID = null
+            )
+        }
+
+
+        composable(route = "ProfileScreen/{uid}/{username}") { backStackEntry ->
+            val uid = backStackEntry.arguments?.getString("uid")
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+
+            ProfileScreen(
+                viewModel = profileScreenVM,
+                navController = navController,
+                username = username,
+                profileID = uid
             )
         }
 
         composable(route = "SearchScreen") {
             SearchScreen(
                 viewModel = searchScreenVM,
-                navController = navController
+                navController = navController,
             )
         }
 

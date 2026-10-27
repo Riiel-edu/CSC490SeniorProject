@@ -59,6 +59,7 @@ import com.example.csc490seniorproject.objects.Song
 import com.google.firebase.firestore.FirebaseFirestore
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -70,13 +71,13 @@ import androidx.compose.runtime.mutableStateMapOf
 import java.util.Locale
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-
+import com.google.firebase.storage.FirebaseStorage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
 private enum class ProfileTab { SONGS, FRIENDS, CHATS }
 @Composable
-fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, username: String) {
+fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, username: String,profileID: String? = null) {
     var isEditing by remember(username) {
         mutableStateOf(false)
     }
@@ -90,57 +91,81 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
         mutableStateOf<Uri?>(null)
     }
 
-    val imagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        if (uri != null) {
-            profilePictureUri = uri
-        }
-    }
+
+
+
     val auth = remember { FirebaseAuth.getInstance() }
     val db = remember { FirebaseFirestore.getInstance() }
     val fredoka = remember {
         FontFamily(Font(R.font.fredoka_medium, FontWeight.Normal))
     }
 
-    var currentUid by remember {
-        mutableStateOf(auth.currentUser?.uid)
+    var currentUid by remember() {
+        mutableStateOf( auth.currentUser?.uid)
     }
+
+
 
     val ProfilePurple = Color(0xFF5D36EB)
     val ProfileCardPurple = Color(0xFFBFB1FA)
 
-    DisposableEffect(auth) {
+    DisposableEffect(auth, profileID) {
         val listener = FirebaseAuth.AuthStateListener {
             currentUid = it.currentUser?.uid
+        }.also {
+            auth.addAuthStateListener(it)
         }
-
-        auth.addAuthStateListener(listener)
 
         onDispose {
-            auth.removeAuthStateListener(listener)
+            listener?.let {
+                auth.removeAuthStateListener(it)
+            }
         }
     }
+    val profileUid = profileID ?: viewModel.profileUid
 
     LaunchedEffect(username, currentUid) {
         viewModel.loadProfile(username, currentUid)
 
-        currentUid?.let { uid ->
-            viewModel.getProfileDetails(uid) {
+        val uid = if (profileID == profileUid) profileID else currentUid
+
+        uid?.let { profileUid ->
+            viewModel.getProfileDetails(profileUid) {
                 aboutMe = viewModel.aboutMe
                 editableUsername = viewModel.profileUsername
-                profilePictureUri = if (viewModel.profilePictureUrl.isNotBlank()) {
-                    Uri.parse(viewModel.profilePictureUrl)
-                } else {
-                    null
-                }
+                profilePictureUri =
+                    if (viewModel.profilePictureUrl.isNotBlank()) {
+                        Uri.parse(viewModel.profilePictureUrl)
+                    } else {
+                        null
+                    }
             }
         }
-
-
     }
 
-    val profileUid = viewModel.profileUid
+
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            profilePictureUri = uri
+            println("PROFILE: Selected image URI = $uri")
+
+            val uid = currentUid
+
+            if (uid != null) {
+                viewModel.uploadProfilePicture(
+                    uid = uid,
+                    imageUri = uri
+                )
+            } else {
+                println("PROFILE: Cannot upload image; currentUid is null")
+            }
+        } else {
+            println("PROFILE: No image selected")
+        }
+    }
+
     val friendsList = viewModel.friendsList
 
     var selectedTab by remember(username, currentUid) {
@@ -150,6 +175,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
     val songsList = remember(username, currentUid) {
         mutableStateListOf<Song>()
     }
+
 
     val descriptions = remember(username, currentUid) {
         mutableStateMapOf<String, String>()
@@ -234,7 +260,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
+        item{
             HorizontalDivider(
                 color = Color.White,
                 thickness = 2.dp
@@ -257,7 +283,11 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                             .fillMaxSize()
                             .clip(CircleShape)
                             .clickable(enabled = isEditing) {
-                                imagePicker.launch("image/*")
+                                imagePicker.launch(
+                                    PickVisualMediaRequest(
+                                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                                    )
+                                )
                             }
                     ) {
                         if (profilePictureUri != null) {
@@ -359,6 +389,7 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                     } else if (
                         currentUid != null && profileUid != null
                     ) {
+
                         val myUid = currentUid
                         val targetUid = profileUid
 
@@ -638,7 +669,9 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
 
                 items(
                     items = friendsList,
-                    key = { it.uid }
+                    key = { friend ->
+                        friend.uid.ifBlank { friend.username }
+                    }
                 ) { friend ->
                     Surface(
                         color = ProfileCardPurple,
@@ -692,7 +725,9 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                             Spacer(Modifier.height(12.dp))
 
                             Button(
-                                onClick = { },
+                                onClick = {
+                                    navController.navigate("ProfileScreen/${friend.uid}/${friend.username}")
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = ProfilePurple
                                 ),

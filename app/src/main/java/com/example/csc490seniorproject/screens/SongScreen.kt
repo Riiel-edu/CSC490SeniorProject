@@ -41,13 +41,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.ui.window.Dialog
+import com.example.csc490seniorproject.viewmodels.SongScreenVM
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 
 @Composable
-fun SongScreen(viewModel: LandingScreenVM, songId: String = "") {
+fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
 
     var songName by remember(songId) {
         mutableStateOf("Loading…")
@@ -62,6 +63,25 @@ fun SongScreen(viewModel: LandingScreenVM, songId: String = "") {
         mutableStateOf<String?>(null)
     }
     var openPanel by remember(songId) {
+        mutableStateOf<String?>(null)
+    }
+
+    var ratingCount by remember(songId) {
+        mutableIntStateOf(0)
+    }
+    var myRating by remember(songId) {
+        mutableIntStateOf(0)
+    }
+    var selectedRating by remember(songId) {
+        mutableIntStateOf(0)
+    }
+    var showRatingDialog by remember(songId) {
+        mutableStateOf(false)
+    }
+    var savingRating by remember(songId) {
+        mutableStateOf(false)
+    }
+    var ratingError by remember(songId) {
         mutableStateOf<String?>(null)
     }
 
@@ -130,6 +150,10 @@ fun SongScreen(viewModel: LandingScreenVM, songId: String = "") {
                                         document.get("rating") as? Number
                                         )?.toDouble()?.coerceIn(0.0, 5.0) ?: 0.0
 
+                                ratingCount = (
+                                        document.get("ratingCount") as? Number
+                                        )?.toInt() ?: 0
+
                                 songDescription = document
                                     .getString("description")
                                     ?.takeIf { it.isNotBlank() }
@@ -148,10 +172,161 @@ fun SongScreen(viewModel: LandingScreenVM, songId: String = "") {
             listener?.remove()
         }
     }
+
+    DisposableEffect(songId) {
+        if (songId.isBlank()) {
+            onDispose { }
+        } else {
+            val listener = FirebaseFirestore.getInstance()
+                .collection("songs")
+                .document(songId)
+                .collection("ratings")
+                .addSnapshotListener { snapshot, error ->
+                    if (error == null && snapshot != null) {
+                        val ratings = snapshot.documents.mapNotNull { doc ->
+                            doc.getLong("rating")?.toInt()
+                                ?.takeIf { it in 1..5 }
+                        }
+
+                        ratingCount = ratings.size
+                        songRating = if (ratings.isNotEmpty()) {
+                            ratings.average()
+                        } else {
+                            0.0
+                        }
+                    }
+                }
+
+            onDispose {
+                listener.remove()
+            }
+        }
+    }
+
     val fredoka = FontFamily(
         Font(R.font.fredoka_medium, FontWeight.Normal)
     )
     val purple = Color(0xFF5D36EB)
+
+
+    if (showRatingDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!savingRating) {
+                    showRatingDialog = false
+                }
+            },
+            title = {
+                Text("Rate this song", color = Color(0xFF5D36EB), fontFamily = fredoka)
+            },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+
+                    HorizontalDivider(
+                        color = Color(0xFF5D36EB),
+                        modifier = Modifier.fillMaxWidth(),
+                        thickness = 2.dp
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        (1..5).forEach { star ->
+                            TextButton(
+                                enabled = !savingRating,
+                                onClick = {
+                                    selectedRating = star
+                                    ratingError = null
+                                },
+                                contentPadding = PaddingValues(2.dp)
+                            ) {
+                                Text(
+                                    text = if (star <= selectedRating) "★" else "☆",
+                                    color = if (star <= selectedRating) {
+                                        Color(0xFF5D36EB)
+                                    } else {
+                                        Color.Gray
+                                    },
+                                    fontSize = 32.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        if (selectedRating == 0) {
+                            "Select 1 to 5 stars"
+                        } else {
+                            "$selectedRating out of 5 stars"
+                        }
+                    )
+
+                    ratingError?.let { message ->
+                        Text(
+                            text = message,
+                            color = Color.Red,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = selectedRating in 1..5 && !savingRating,
+                    colors = ButtonDefaults.buttonColors(containerColor = purple),
+                    onClick = {
+                        val uid = auth.currentUser?.uid
+
+                        if (uid == null) {
+                            ratingError = "Please log in first."
+                            return@Button
+                        }
+
+                        savingRating = true
+                        ratingError = null
+
+                        val db = FirebaseFirestore.getInstance()
+                        val songRef = db.collection("songs")
+                            .document(songId)
+
+                        val ratingRef = songRef
+                            .collection("ratings")
+                            .document(uid)
+
+                        viewModel.saveSongRating(
+                            songId = songId,
+                            ratingValue = selectedRating,
+                            onSuccess = {
+                                savingRating = false
+                                showRatingDialog = false
+                            },
+                            onError = { message ->
+                                savingRating = false
+                                ratingError = message
+                            }
+                        )
+                    }
+                ) {
+                    Text(if (savingRating) "Saving..." else "Submit rating")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !savingRating,
+                    onClick = {
+                        showRatingDialog = false
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
 
     if (showDescriptionEditor && canEditDescription) {
         AlertDialog(
@@ -281,19 +456,77 @@ fun SongScreen(viewModel: LandingScreenVM, songId: String = "") {
                     fontSize = 24.sp
                 )
 
-                Text(
-                    text = when {
-                        songLoadError != null -> "Rating unavailable"
-                        songRating <= 0.0 -> "No ratings yet"
-                        else -> String.format(
-                            java.util.Locale.US,
-                            "★ %.1f / 5",
-                            songRating
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    val filledStars = kotlin.math.floor(songRating + 0.5)
+                        .toInt()
+                        .coerceIn(0, 5)
+
+                    repeat(5) { index ->
+                        Text(
+                            text = if (index < filledStars) "★" else "☆",
+                            color = if (index < filledStars) {
+                                Color(0xFFFFB300)
+                            } else {
+                                Color.LightGray
+                            },
+                            fontSize = 18.sp
                         )
+                    }
+
+                    Text(
+                        text = if (ratingCount > 0) {
+                            String.format(
+                                java.util.Locale.US,
+                                "%.1f/5.0",
+                                songRating
+                            )
+                        } else {
+                            "0.0/5.0"
+                        },
+                        fontFamily = fredoka,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+
+                    Text(
+                        text = if (ratingCount > 0) {
+                            "($ratingCount ratings)"
+                        } else {
+                            "(No ratings)"
+                        },
+                        fontFamily = fredoka,
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        if (currentUid == null) {
+                            ratingError = "Please log in to rate this song."
+                        } else {
+                            selectedRating = myRating
+                            ratingError = null
+                            showRatingDialog = true
+                        }
                     },
-                    fontFamily = fredoka,
-                    fontSize = 14.sp
-                )
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = purple
+                    ),
+                    contentPadding = PaddingValues(
+                        horizontal = 16.dp,
+                        vertical = 4.dp
+                    )
+                ) {
+                    Text(
+                        text = if (myRating > 0) "Change rating" else "Rate",
+                        fontSize = 12.sp
+                    )
+                }
             }
         }
 

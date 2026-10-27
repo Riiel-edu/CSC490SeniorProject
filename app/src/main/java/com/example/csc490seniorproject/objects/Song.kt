@@ -8,6 +8,8 @@ import java.util.UUID
 data class Song(
     @DocumentId val id: String = UUID.randomUUID().toString(),
     val ownerId: String = "",
+    val published: Boolean = false,
+    val sharedWith: List<String> = emptyList(),
     val name: String = "Untitled Song",
     val rating: Double = 0.0,
     val bpm: Int = 120,
