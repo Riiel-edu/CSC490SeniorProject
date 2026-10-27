@@ -242,64 +242,7 @@ fun ChatBox(modifier: Modifier = Modifier, friendUsernames: List<String> = empty
                             .heightIn(max = 420.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (showPicker && friendPickerIds.isNotEmpty()) {
-                            item {
-                                Text(
-                                    "Friends",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = Color.Gray,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                            }
-                            items(friendPickerIds, key = { "friend_$it" }) { peerId ->
-                                val person = people[peerId]
-                                Surface(
-                                    onClick = {
-                                        person?.let { openPerson(it) }
-                                    },
-                                    enabled = person != null,
-                                    color = Color.White,
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        ChatAvatar(person?.username ?: "?")
-                                        Text(
-                                            person?.username ?: "Loading profile…",
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        Text(
-                                            "Tap to start chatting",
-                                            color = Color.Gray,
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-                                    }
-                                }
-                            }
-                            item { Spacer(Modifier.height(4.dp)) }
-                        }
-
-                        if (conversationIds.isEmpty() && !(showPicker && friendPickerIds.isNotEmpty())) {
-                            item {
-                                Text(
-                                    when {
-                                        loading -> "Loading conversations…"
-                                        search.isNotBlank() -> "No matching chats."
-                                        else -> "Your conversations appear here after you send or receive a message."
-                                    },
-                                    color = Color.Gray,
-                                    modifier = Modifier.padding(vertical = 24.dp)
-                                )
-                            }
-                        }
-
+                        // Conversations first, most recent on top.
                         items(conversationIds, key = { "conv_$it" }) { peerId ->
                             val person = people[peerId]
                             val lastMessage = conversations[peerId]?.lastOrNull()
@@ -353,6 +296,68 @@ fun ChatBox(modifier: Modifier = Modifier, friendUsernames: List<String> = empty
                                         )
                                     }
                                 }
+                            }
+                        }
+
+                        // Then friends you haven't chatted with yet — only shown while
+                        // the search bar is focused or you're typing.
+                        if (showPicker && friendPickerIds.isNotEmpty()) {
+                            if (conversationIds.isNotEmpty()) {
+                                item { Spacer(Modifier.height(4.dp)) }
+                            }
+                            item {
+                                Text(
+                                    "Friends",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+                            items(friendPickerIds, key = { "friend_$it" }) { peerId ->
+                                val person = people[peerId]
+                                Surface(
+                                    onClick = {
+                                        person?.let { openPerson(it) }
+                                    },
+                                    enabled = person != null,
+                                    color = Color.White,
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        ChatAvatar(person?.username ?: "?")
+                                        Text(
+                                            person?.username ?: "Loading profile…",
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(
+                                            "Tap to start chatting",
+                                            color = Color.Gray,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if (conversationIds.isEmpty() && !(showPicker && friendPickerIds.isNotEmpty())) {
+                            item {
+                                Text(
+                                    when {
+                                        loading -> "Loading conversations…"
+                                        search.isNotBlank() -> "No matching chats."
+                                        else -> "Your conversations appear here after you send or receive a message."
+                                    },
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(vertical = 24.dp)
+                                )
                             }
                         }
                     }

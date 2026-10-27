@@ -3,6 +3,7 @@ package com.example.csc490seniorproject.viewmodels
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -17,7 +18,11 @@ import com.google.firebase.firestore.ListenerRegistration
 class SearchScreenVM(application: Application) : AndroidViewModel(application) {
     val songsList = mutableStateListOf<Song>()
     val userResults = mutableStateListOf<User>()
-    val requestedUids = mutableStateListOf<String>()
+
+    // Real relationship status per uid (NONE / REQUEST_SENT / REQUEST_RECEIVED / FRIENDS),
+    // looked up from Firestore so search results reflect reality instead of only
+    // remembering requests sent during this screen's lifetime.
+    val friendStatuses = mutableStateMapOf<String, FriendStatus>()
 
     var songsError by mutableStateOf<String?>(null)
         private set
@@ -38,7 +43,7 @@ class SearchScreenVM(application: Application) : AndroidViewModel(application) {
 
         songsList.clear()
         userResults.clear()
-        requestedUids.clear()
+        friendStatuses.clear()
         songsError = null
         searchGeneration++
 
@@ -82,17 +87,18 @@ class SearchScreenVM(application: Application) : AndroidViewModel(application) {
     }
 
     fun searchUsers(query: String) {
+        val myUid = auth.currentUser?.uid
         val lowerQuery = query.trim().lowercase()
         searchGeneration++
         val thisGeneration = searchGeneration
 
         userResults.clear()
-        if (lowerQuery.isEmpty()) return
+        if (lowerQuery.isEmpty() || myUid == null) return
 
         db.collection("usernames")
             .orderBy(FieldPath.documentId())
             .startAt(lowerQuery)
-            .endAt(lowerQuery + "\uf8ff")
+            .endAt(lowerQuery + "")
             .limit(20)
             .get()
             .addOnSuccessListener usernamesLoaded@{ snapshot ->
@@ -103,6 +109,7 @@ class SearchScreenVM(application: Application) : AndroidViewModel(application) {
                 val uids = snapshot.documents
                     .mapNotNull { it.getString("uid") }
                     .distinct()
+                    .filter { it != myUid } // never show yourself in your own search
 
                 for (uid in uids) {
                     db.collection("users")
@@ -130,6 +137,7 @@ class SearchScreenVM(application: Application) : AndroidViewModel(application) {
                                         friends = arrayListOf()
                                     )
                                 )
+                                refreshFriendStatus(myUid, uid, thisGeneration)
                             }
                         }
                         .addOnFailureListener { error ->
@@ -142,10 +150,64 @@ class SearchScreenVM(application: Application) : AndroidViewModel(application) {
             }
     }
 
+    // Checks the actual friends/friendRequests subcollections so a result shows
+    // Friends / Request Sent / Already follows you instead of always "Add Friend".
+    private fun refreshFriendStatus(myUid: String, targetUid: String, generation: Int) {
+        db.collection("users").document(myUid)
+            .collection("friends").document(targetUid)
+            .get()
+            .addOnSuccessListener { friendDoc ->
+                if (generation != searchGeneration) return@addOnSuccessListener
+
+                if (friendDoc.exists()) {
+                    friendStatuses[targetUid] = FriendStatus.FRIENDS
+                    return@addOnSuccessListener
+                }
+
+                db.collection("users").document(targetUid)
+                    .collection("friendRequests").document(myUid)
+                    .get()
+                    .addOnSuccessListener { sentDoc ->
+                        if (generation != searchGeneration) return@addOnSuccessListener
+
+                        if (sentDoc.exists()) {
+                            friendStatuses[targetUid] = FriendStatus.REQUEST_SENT
+                            return@addOnSuccessListener
+                        }
+
+                        db.collection("users").document(myUid)
+                            .collection("friendRequests").document(targetUid)
+                            .get()
+                            .addOnSuccessListener { receivedDoc ->
+                                if (generation != searchGeneration) return@addOnSuccessListener
+
+                                friendStatuses[targetUid] = if (receivedDoc.exists()) {
+                                    FriendStatus.REQUEST_RECEIVED
+                                } else {
+                                    FriendStatus.NONE
+                                }
+                            }
+                            .addOnFailureListener {
+                                if (generation == searchGeneration) {
+                                    friendStatuses[targetUid] = FriendStatus.NONE
+                                }
+                            }
+                    }
+                    .addOnFailureListener {
+                        if (generation == searchGeneration) {
+                            friendStatuses[targetUid] = FriendStatus.NONE
+                        }
+                    }
+            }
+            .addOnFailureListener {
+                if (generation == searchGeneration) {
+                    friendStatuses[targetUid] = FriendStatus.NONE
+                }
+            }
+    }
+
     fun sendFriendRequest(myUid: String, targetUid: String) {
         if (auth.currentUser?.uid != myUid || myUid == targetUid) return
-
-        val generation = songsGeneration
 
         db.collection("users")
             .document(targetUid)
@@ -158,12 +220,8 @@ class SearchScreenVM(application: Application) : AndroidViewModel(application) {
                 )
             )
             .addOnSuccessListener {
-                if (
-                    generation == songsGeneration &&
-                    auth.currentUser?.uid == myUid &&
-                    targetUid !in requestedUids
-                ) {
-                    requestedUids.add(targetUid)
+                if (auth.currentUser?.uid == myUid) {
+                    friendStatuses[targetUid] = FriendStatus.REQUEST_SENT
                 }
             }
             .addOnFailureListener { error ->

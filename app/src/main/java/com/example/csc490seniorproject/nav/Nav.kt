@@ -38,6 +38,7 @@ import com.example.csc490seniorproject.viewmodels.ProfileScreenVM
 import com.example.csc490seniorproject.viewmodels.SongScreenVM
 import com.example.csc490seniorproject.viewmodels.WorkspaceViewModel
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 @SuppressLint("ContextCastToActivity")
 @Composable
@@ -55,6 +56,24 @@ fun Nav(
         mutableStateOf("Username")
     }
 
+    LaunchedEffect(Unit) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+
+        if (uid != null && currentUsername == "Username") {
+            FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(uid)
+                .get()
+                .addOnSuccessListener { document ->
+                    document.getString("username")?.let { username ->
+                        currentUsername = username
+                    }
+                }
+                .addOnFailureListener { e ->
+                    println("NAV: Failed to resolve returning user's username: $e")
+                }
+        }
+    }
     NavHost(
         navController = navController,
         startDestination =
