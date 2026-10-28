@@ -1,5 +1,6 @@
 package com.example.csc490seniorproject.screens
 
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.csc490seniorproject.R
 import com.example.csc490seniorproject.viewmodels.SongScreenVM
 import com.google.firebase.auth.FirebaseAuth
@@ -35,7 +38,7 @@ import com.google.firebase.firestore.Query
 import java.util.Locale
 
 @Composable
-fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
+fun SongScreen(viewModel: SongScreenVM, songId: String = "", navController: NavController) {
 
     var songName by remember(songId) {
         mutableStateOf("Loading…")
@@ -88,6 +91,42 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
         mutableStateOf<String?>(null)
     }
 
+    var songTags by remember(songId) {
+        mutableStateOf<List<String>>(emptyList())
+    }
+
+    var showSongTagEditor by remember(songId) {
+        mutableStateOf(false)
+    }
+
+    var selectedSongTags by remember(songId) {
+        mutableStateOf(setOf<String>())
+    }
+
+    var savingSongTags by remember(songId) {
+        mutableStateOf(false)
+    }
+
+    var songTagError by remember(songId) {
+        mutableStateOf<String?>(null)
+    }
+
+    var creatorUsername by remember(songId) {
+        mutableStateOf("Loading creator…")
+    }
+
+    var creatorAboutMe by remember(songId) {
+        mutableStateOf("No description provided.")
+    }
+
+    var creatorProfilePictureUrl by remember(songId) {
+        mutableStateOf("")
+    }
+
+    var creatorProfileLoading by remember(songId) {
+        mutableStateOf(true)
+    }
+
     val auth = remember { FirebaseAuth.getInstance() }
     var currentUid by remember {
         mutableStateOf(auth.currentUser?.uid)
@@ -97,6 +136,14 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
         Font(R.font.fredoka_medium, FontWeight.Normal)
     )
     val purple = Color(0xFF5D36EB)
+
+    val musicGenres = listOf(
+        "Rock",
+        "Pop",
+        "Jazz",
+        "Hip-Hop",
+        "Country"
+    )
 
     openPanel?.let { panel ->
         SongFeaturePopup(
@@ -120,6 +167,12 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
     }
 
     val canEditDescription =
+        songId.isNotBlank() &&
+                ownerId.isNotBlank() &&
+                currentUid == ownerId &&
+                songLoadError == null
+
+    val canEditSongTags =
         songId.isNotBlank() &&
                 ownerId.isNotBlank() &&
                 currentUid == ownerId &&
@@ -167,12 +220,68 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                                     .getString("description")
                                     ?.takeIf { it.isNotBlank() }
                                     ?: "No description provided."
+
+                                songTags = document
+                                    .get("tags")
+                                    ?.let { it as? List<*> }
+                                    .orEmpty()
+                                    .filterIsInstance<String>()
+                                    .filter { it in musicGenres }
                             }
                         }
                     }
                 }
         } else {
             songName = "No song selected"
+            null
+        }
+
+        onDispose {
+            active = false
+            listener?.remove()
+        }
+    }
+
+    DisposableEffect(ownerId) {
+        var active = true
+
+        creatorUsername = "Loading creator…"
+        creatorAboutMe = "No description provided."
+        creatorProfilePictureUrl = ""
+        creatorProfileLoading = ownerId.isNotBlank()
+
+        val listener = if (ownerId.isNotBlank()) {
+            FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(ownerId)
+                .addSnapshotListener { document, error ->
+                    if (active) {
+                        creatorProfileLoading = false
+
+                        if (error == null && document != null &&
+                            document.exists()
+                        ) {
+                            creatorUsername = document
+                                .getString("username")
+                                ?.takeIf { it.isNotBlank() }
+                                ?: "Unknown user"
+
+                            creatorAboutMe = document
+                                .getString("aboutMe")
+                                ?.takeIf { it.isNotBlank() }
+                                ?: "No description provided."
+
+                            creatorProfilePictureUrl = document
+                                .getString("profilePictureUrl")
+                                .orEmpty()
+                        } else {
+                            creatorUsername = "Unknown user"
+                            creatorAboutMe = "Unable to load creator details."
+                            creatorProfilePictureUrl = ""
+                        }
+                    }
+                }
+        } else {
             null
         }
 
@@ -361,6 +470,108 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
         )
     }
 
+
+    if (showSongTagEditor && canEditSongTags) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!savingSongTags) {
+                    showSongTagEditor = false
+                }
+            },
+            title = {
+                Text(
+                    text = "Edit Song Tags",
+                    color = purple,
+                    fontFamily = fredoka
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Select all genres that describe this song.")
+
+                    musicGenres.forEach { genre ->
+                        FilterChip(
+                            selected = genre in selectedSongTags,
+                            onClick = {
+                                selectedSongTags =
+                                    if (genre in selectedSongTags) {
+                                        selectedSongTags - genre
+                                    } else {
+                                        selectedSongTags + genre
+                                    }
+
+                                songTagError = null
+                            },
+                            label = {
+                                Text(genre)
+                            },
+                            enabled = !savingSongTags
+                        )
+                    }
+
+                    songTagError?.let { error ->
+                        Text(
+                            text = error,
+                            color = Color.Red,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !savingSongTags,
+                    onClick = {
+                        if (auth.currentUser?.uid != ownerId) {
+                            songTagError =
+                                "Only the song owner can edit these tags."
+                        } else {
+                            savingSongTags = true
+                            songTagError = null
+
+                            FirebaseFirestore.getInstance()
+                                .collection("songs")
+                                .document(songId)
+                                .update(
+                                    "tags",
+                                    musicGenres.filter {
+                                        it in selectedSongTags
+                                    }
+                                )
+                                .addOnSuccessListener {
+                                    savingSongTags = false
+                                    showSongTagEditor = false
+                                }
+                                .addOnFailureListener { exception ->
+                                    savingSongTags = false
+                                    songTagError =
+                                        exception.localizedMessage
+                                            ?: "Unable to save song tags."
+                                }
+                        }
+                    }
+                ) {
+                    Text(
+                        if (savingSongTags) "Saving..." else "Save"
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !savingSongTags,
+                    onClick = {
+                        showSongTagEditor = false
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+
     if (showDescriptionEditor && canEditDescription) {
         AlertDialog(
             onDismissRequest = {
@@ -476,15 +687,82 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
 
             Column(
                 modifier = Modifier
-                    .height(120.dp)
+                    .weight(1f)
+                    .heightIn(min = 120.dp)
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            ){
                 Text(
                     text = songName,
                     fontFamily = fredoka,
                     fontSize = 24.sp
                 )
+
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (canEditSongTags) {
+                        TextButton(
+                            onClick = {
+                                selectedSongTags = songTags.toSet()
+                                songTagError = null
+                                showSongTagEditor = true
+                            },
+                            contentPadding = PaddingValues(
+                                horizontal = 4.dp,
+                                vertical = 0.dp
+                            )
+                        ) {
+                            Text(
+                                text = "Edit",
+                                fontSize = 12.sp,
+                                color = purple
+                            )
+                        }
+                    }
+                }
+
+                if (songTags.isEmpty()) {
+                    Text(
+                        text = "No song tags yet",
+                        fontFamily = fredoka,
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                } else {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        songTags.chunked(3).forEach { rowTags ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                rowTags.forEach { tag ->
+                                    Surface(
+                                        color = purple,
+                                        shape = RoundedCornerShape(16.dp)
+                                    ) {
+                                        Text(
+                                            text = tag,
+                                            fontFamily = fredoka,
+                                            color = Color.White,
+                                            fontSize = 10.sp,
+                                            maxLines = 1,
+                                            modifier = Modifier.padding(
+                                                horizontal = 8.dp,
+                                                vertical = 4.dp
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -692,6 +970,124 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                 }
             }
         }
+
+        Spacer(Modifier.height(16.dp))
+
+        Text(
+            text = "Creator",
+            fontFamily = fredoka,
+            fontSize = 24.sp
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            shadowElevation = 4.dp,
+            border = BorderStroke(2.dp, purple),
+            color = Color(0xFFF7F3FF),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        modifier = Modifier.size(76.dp)
+                    ) {
+                        if (creatorProfilePictureUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = creatorProfilePictureUrl,
+                                contentDescription = "Creator profile picture",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                            )
+                        } else {
+                            Image(
+                                painter = painterResource(R.drawable.default_pfp),
+                                contentDescription = "Creator profile picture",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = if (creatorProfileLoading) {
+                                "Loading creator…"
+                            } else {
+                                creatorUsername
+                            },
+                            fontFamily = fredoka,
+                            fontSize = 18.sp,
+                            color = purple,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Text(
+                            text = "Song owner",
+                            fontFamily = fredoka,
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+
+                Text(
+                    text = "About Me",
+                    fontFamily = fredoka,
+                    fontSize = 16.sp,
+                    color = purple
+                )
+
+                Text(
+                    text = creatorAboutMe,
+                    fontFamily = fredoka,
+                    fontSize = 13.sp,
+                    color = Color(0xFF444444)
+                )
+
+                Button(
+                    onClick = {
+                        if (ownerId.isNotBlank() && creatorUsername != "Unknown user") {
+                            navController.navigate(
+                                "ProfileScreen/${Uri.encode(ownerId)}/${Uri.encode(creatorUsername)}"
+                            )
+                        }
+                    },
+                    enabled = ownerId.isNotBlank() &&
+                            !creatorProfileLoading &&
+                            creatorUsername != "Unknown user",
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = purple
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Visit Profile",
+                        fontFamily = fredoka,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
     }
 }
 

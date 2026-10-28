@@ -25,6 +25,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -64,6 +65,12 @@ import com.google.firebase.firestore.FirebaseFirestore
 import java.util.Locale
 import kotlin.math.floor
 
+private enum class SongSortOption {
+    NEWLY_ADDED,
+    HIGHEST_RATED,
+    MOST_PLAYED
+}
+
 @Composable
 fun SearchScreen(
     viewModel: SearchScreenVM,
@@ -76,23 +83,81 @@ fun SearchScreen(
     var showFilterDialog by remember { mutableStateOf(false) }
     var selectedFilters by remember { mutableStateOf(setOf<String>()) }
 
-    val selectedStates = remember {
-        mutableStateListOf(false, false, false)
+    var appliedFilters by remember {
+        mutableStateOf(setOf<String>())
     }
 
     var text by rememberSaveable { mutableStateOf("") }
 
-    val visibleSongs = if (text.isBlank()) {
-        viewModel.songsList
-    } else {
-        viewModel.songsList.filter { song ->
-            song.name.contains(text.trim(), ignoreCase = true)
-        }
+    val activeFilters = appliedFilters
+
+    val selectedGenres = activeFilters.filter {
+        it in listOf("Rock", "Pop", "Jazz", "Hip-Hop", "Country")
     }
 
-    // Already-friends don't need to clutter search results — the Friends tab is for them.
-    val visibleUsers = viewModel.userResults.filter {
-        viewModel.friendStatuses[it.uid] != FriendStatus.FRIENDS
+    var selectedSort by rememberSaveable {
+        mutableStateOf(SongSortOption.NEWLY_ADDED)
+    }
+
+    val showSongs = "Song" in activeFilters ||
+            ("Song" !in activeFilters && "Profile" !in activeFilters)
+
+    val showProfiles = "Profile" in activeFilters ||
+            ("Song" !in activeFilters && "Profile" !in activeFilters)
+
+    val liveRatings = remember {
+        androidx.compose.runtime.mutableStateMapOf<String, Double>()
+    }
+
+    val visibleSongs = viewModel.songsList
+        .filter { song ->
+            val matchesText = text.isBlank() ||
+                    song.name.contains(text.trim(), ignoreCase = true)
+
+            val matchesGenre = selectedGenres.isEmpty() ||
+                    selectedGenres.any { selectedGenre ->
+                        song.genre.any { songGenre ->
+                            songGenre.equals(
+                                selectedGenre,
+                                ignoreCase = true
+                            )
+                        }
+                    }
+
+            matchesText && matchesGenre
+        }
+        .let { songs ->
+            when (selectedSort) {
+                SongSortOption.NEWLY_ADDED ->
+                    songs.sortedByDescending { song ->
+                        song.createdAt?.time ?: 0L
+                    }
+
+                SongSortOption.HIGHEST_RATED ->
+                    songs.sortedByDescending { song ->
+                        liveRatings[song.id] ?: 0.0
+                    }
+
+                SongSortOption.MOST_PLAYED ->
+                    songs
+            }
+        }
+
+    val visibleUsers = viewModel.userResults.filter { user ->
+        val matchesText = text.isBlank() ||
+                user.username.contains(text.trim(), ignoreCase = true)
+
+        val matchesGenre = selectedGenres.isEmpty() ||
+                selectedGenres.any { selectedGenre ->
+                    user.genre.any { userGenre ->
+                        userGenre.equals(selectedGenre, ignoreCase = true)
+                    }
+                }
+
+        showProfiles &&
+                matchesText &&
+                matchesGenre &&
+                viewModel.friendStatuses[user.uid] != FriendStatus.FRIENDS
     }
 
     Column(
@@ -216,7 +281,7 @@ fun SearchScreen(
                         Spacer(Modifier.height(12.dp))
 
                         Text(
-                            "Rating",
+                            "Sort By",
                             fontFamily = fredoka,
                             style = MaterialTheme.typography.titleMedium
                         )
@@ -225,22 +290,35 @@ fun SearchScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            items(listOf("1", "2", "3", "4", "5")) { rating ->
+                            items(
+                                listOf(
+                                    SongSortOption.NEWLY_ADDED,
+                                    SongSortOption.HIGHEST_RATED,
+                                    SongSortOption.MOST_PLAYED
+                                )
+                            ) { option ->
+
+                                val label = when (option) {
+                                    SongSortOption.NEWLY_ADDED -> "Most Recent"
+                                    SongSortOption.HIGHEST_RATED -> "Highest Rated"
+                                    SongSortOption.MOST_PLAYED -> "Most Viewed"
+                                }
+
                                 FilterChip(
-                                    selected = rating in selectedFilters,
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFF5D36EB),
-                                        selectedLabelColor = Color.White,
-                                        containerColor = Color(0xFFbfb1fa),
-                                        labelColor = Color.White),
+                                    selected = selectedSort == option,
+                                    enabled = option != SongSortOption.MOST_PLAYED,
                                     onClick = {
-                                        selectedFilters =
-                                            if (rating in selectedFilters)
-                                                selectedFilters - rating
-                                            else
-                                                selectedFilters + rating
+                                        selectedSort = option
                                     },
-                                    label = { Text(rating) }
+                                    label = { Text(label) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = purple,
+                                        selectedLabelColor = Color.White,
+                                        containerColor = cardPurple,
+                                        labelColor = Color.White,
+                                        disabledContainerColor = cardPurple.copy(alpha = 0.5f),
+                                        disabledLabelColor = Color.Gray
+                                    )
                                 )
                             }
                         }
@@ -249,7 +327,7 @@ fun SearchScreen(
                 confirmButton = {
                     Button(
                         onClick = {
-                            // Use selectedFilters here
+                            appliedFilters = selectedFilters
                             showFilterDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = purple)
@@ -315,8 +393,6 @@ fun SearchScreen(
                 }
             }
 
-            // Songs — always visible when there's no query; filters down (and can
-            // disappear) once you start typing.
             if (visibleSongs.isNotEmpty()) {
                 item {
                     Text(
@@ -354,16 +430,20 @@ fun SearchScreen(
                                     }
 
                                     ratingCount = ratings.size
+
                                     liveRating = if (ratings.isNotEmpty()) {
                                         ratings.average()
                                     } else {
                                         0.0
                                     }
+
+                                    liveRatings[song.id] = liveRating
                                 }
                             }
 
                         onDispose {
                             listener.remove()
+                            liveRatings.remove(song.id)
                         }
                     }
 
@@ -583,11 +663,14 @@ private fun UserResultCard(
                         }
 
                         FriendStatus.NONE -> {
-                            Button(
+                            IconButton(
                                 onClick = onAddFriend,
-                                colors = ButtonDefaults.buttonColors(containerColor = purple)
                             ) {
-                                Text("Add Friend")
+                                Image(
+                                    painter = painterResource(id = R.drawable.add_friend_2),
+                                    contentDescription = "Add friend",
+                                    contentScale = ContentScale.Crop,
+                                )
                             }
                         }
 
