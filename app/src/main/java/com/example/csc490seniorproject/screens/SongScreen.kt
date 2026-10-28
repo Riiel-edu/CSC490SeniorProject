@@ -2,50 +2,37 @@ package com.example.csc490seniorproject.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.csc490seniorproject.R
-import com.example.csc490seniorproject.viewmodels.LandingScreenVM
-import androidx.compose.runtime.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
 import androidx.compose.ui.window.Dialog
+import com.example.csc490seniorproject.R
 import com.example.csc490seniorproject.viewmodels.SongScreenVM
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import java.util.Locale
 
 @Composable
 fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
@@ -85,14 +72,18 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
         mutableStateOf<String?>(null)
     }
 
-    openPanel?.let { panel ->
-        SongFeaturePopup( songId = songId, leaderboard = panel == "Leaderboard", onClose = { openPanel = null }
-        )
+    var ownerId by remember(songId) {
+        mutableStateOf("")
     }
-    var ownerId by remember(songId) { mutableStateOf("") }
-    var showDescriptionEditor by remember(songId) { mutableStateOf(false) }
-    var descriptionDraft by remember(songId) { mutableStateOf("") }
-    var savingDescription by remember(songId) { mutableStateOf(false) }
+    var showDescriptionEditor by remember(songId) {
+        mutableStateOf(false)
+    }
+    var descriptionDraft by remember(songId) {
+        mutableStateOf("")
+    }
+    var savingDescription by remember(songId) {
+        mutableStateOf(false)
+    }
     var descriptionError by remember(songId) {
         mutableStateOf<String?>(null)
     }
@@ -102,11 +93,25 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
         mutableStateOf(auth.currentUser?.uid)
     }
 
+    val fredoka = FontFamily(
+        Font(R.font.fredoka_medium, FontWeight.Normal)
+    )
+    val purple = Color(0xFF5D36EB)
+
+    openPanel?.let { panel ->
+        SongFeaturePopup(
+            songId = songId,
+            leaderboard = panel == "Leaderboard",
+            onClose = { openPanel = null }
+        )
+    }
+
     DisposableEffect(auth) {
         val listener = FirebaseAuth.AuthStateListener {
             currentUid = it.currentUser?.uid
             showDescriptionEditor = false
         }
+
         auth.addAuthStateListener(listener)
 
         onDispose {
@@ -131,7 +136,8 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                     if (active) {
                         when {
                             error != null -> {
-                                songLoadError = "Unable to load song details."
+                                songLoadError =
+                                    "Unable to load song details."
                                 songName = "Unable to load song"
                             }
 
@@ -141,7 +147,10 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                             }
 
                             else -> {
-                                ownerId = document.getString("ownerId").orEmpty()
+                                ownerId = document
+                                    .getString("ownerId")
+                                    .orEmpty()
+
                                 songLoadError = null
                                 songName = document.getString("name")
                                     ?: "Untitled Song"
@@ -174,17 +183,18 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
     }
 
     DisposableEffect(songId) {
-        if (songId.isBlank()) {
-            onDispose { }
-        } else {
-            val listener = FirebaseFirestore.getInstance()
+        var active = true
+
+        val listener = if (songId.isNotBlank()) {
+            FirebaseFirestore.getInstance()
                 .collection("songs")
                 .document(songId)
                 .collection("ratings")
                 .addSnapshotListener { snapshot, error ->
-                    if (error == null && snapshot != null) {
+                    if (active && error == null && snapshot != null) {
                         val ratings = snapshot.documents.mapNotNull { doc ->
-                            doc.getLong("rating")?.toInt()
+                            doc.getLong("rating")
+                                ?.toInt()
                                 ?.takeIf { it in 1..5 }
                         }
 
@@ -196,37 +206,66 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                         }
                     }
                 }
+        } else {
+            null
+        }
 
-            onDispose {
-                listener.remove()
-            }
+        onDispose {
+            active = false
+            listener?.remove()
         }
     }
 
-    val fredoka = FontFamily(
-        Font(R.font.fredoka_medium, FontWeight.Normal)
-    )
-    val purple = Color(0xFF5D36EB)
+    // Load the current user's existing rating.
+    DisposableEffect(songId, currentUid) {
+        var active = true
+        myRating = 0
 
+        val uid = currentUid
+        val listener = if (songId.isNotBlank() && uid != null) {
+            FirebaseFirestore.getInstance()
+                .collection("songs")
+                .document(songId)
+                .collection("ratings")
+                .document(uid)
+                .addSnapshotListener { document, error ->
+                    if (active && error == null) {
+                        myRating = document
+                            ?.getLong("rating")
+                            ?.toInt()
+                            ?.takeIf { it in 1..5 }
+                            ?: 0
+                    }
+                }
+        } else {
+            null
+        }
+
+        onDispose {
+            active = false
+            listener?.remove()
+        }
+    }
 
     if (showRatingDialog) {
         AlertDialog(
             onDismissRequest = {
-                if (!savingRating) {
-                    showRatingDialog = false
-                }
+                if (!savingRating) showRatingDialog = false
             },
             title = {
-                Text("Rate this song", color = Color(0xFF5D36EB), fontFamily = fredoka)
+                Text(
+                    text = "Rate this song",
+                    color = purple,
+                    fontFamily = fredoka
+                )
             },
             text = {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-
                     HorizontalDivider(
-                        color = Color(0xFF5D36EB),
+                        color = purple,
                         modifier = Modifier.fillMaxWidth(),
                         thickness = 2.dp
                     )
@@ -245,9 +284,13 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                                 contentPadding = PaddingValues(2.dp)
                             ) {
                                 Text(
-                                    text = if (star <= selectedRating) "★" else "☆",
+                                    text = if (star <= selectedRating) {
+                                        "★"
+                                    } else {
+                                        "☆"
+                                    },
                                     color = if (star <= selectedRating) {
-                                        Color(0xFF5D36EB)
+                                        purple
                                     } else {
                                         Color.Gray
                                     },
@@ -258,16 +301,16 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                     }
 
                     Text(
-                        if (selectedRating == 0) {
+                        text = if (selectedRating == 0) {
                             "Select 1 to 5 stars"
                         } else {
                             "$selectedRating out of 5 stars"
                         }
                     )
 
-                    ratingError?.let { message ->
+                    ratingError?.let {
                         Text(
-                            text = message,
+                            text = it,
                             color = Color.Red,
                             fontSize = 12.sp
                         )
@@ -277,49 +320,40 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
             confirmButton = {
                 Button(
                     enabled = selectedRating in 1..5 && !savingRating,
-                    colors = ButtonDefaults.buttonColors(containerColor = purple),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = purple
+                    ),
                     onClick = {
-                        val uid = auth.currentUser?.uid
-
-                        if (uid == null) {
+                        if (auth.currentUser == null) {
                             ratingError = "Please log in first."
-                            return@Button
+                        } else {
+                            savingRating = true
+                            ratingError = null
+
+                            viewModel.saveSongRating(
+                                songId = songId,
+                                ratingValue = selectedRating,
+                                onSuccess = {
+                                    savingRating = false
+                                    showRatingDialog = false
+                                },
+                                onError = {
+                                    savingRating = false
+                                    ratingError = it
+                                }
+                            )
                         }
-
-                        savingRating = true
-                        ratingError = null
-
-                        val db = FirebaseFirestore.getInstance()
-                        val songRef = db.collection("songs")
-                            .document(songId)
-
-                        val ratingRef = songRef
-                            .collection("ratings")
-                            .document(uid)
-
-                        viewModel.saveSongRating(
-                            songId = songId,
-                            ratingValue = selectedRating,
-                            onSuccess = {
-                                savingRating = false
-                                showRatingDialog = false
-                            },
-                            onError = { message ->
-                                savingRating = false
-                                ratingError = message
-                            }
-                        )
                     }
                 ) {
-                    Text(if (savingRating) "Saving..." else "Submit rating")
+                    Text(
+                        if (savingRating) "Saving..." else "Submit rating"
+                    )
                 }
             },
             dismissButton = {
                 TextButton(
                     enabled = !savingRating,
-                    onClick = {
-                        showRatingDialog = false
-                    }
+                    onClick = { showRatingDialog = false }
                 ) {
                     Text("Cancel")
                 }
@@ -327,13 +361,10 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
         )
     }
 
-
     if (showDescriptionEditor && canEditDescription) {
         AlertDialog(
             onDismissRequest = {
-                if (!savingDescription) {
-                    showDescriptionEditor = false
-                }
+                if (!savingDescription) showDescriptionEditor = false
             },
             title = {
                 Text("Edit description")
@@ -389,9 +420,8 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                                 }
                                 .addOnFailureListener {
                                     savingDescription = false
-                                    descriptionError =
-                                        it.localizedMessage
-                                            ?: "Unable to save description."
+                                    descriptionError = it.localizedMessage
+                                        ?: "Unable to save description."
                                 }
                         }
                     }
@@ -418,7 +448,7 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
             .padding(20.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Spacer(modifier = Modifier.height(2.5.dp))
+        Spacer(Modifier.height(2.5.dp))
 
         HorizontalDivider(
             color = Color.White,
@@ -426,7 +456,7 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
             thickness = 2.dp
         )
 
-        Spacer(modifier = Modifier.height(7.5.dp))
+        Spacer(Modifier.height(7.5.dp))
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -479,7 +509,7 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                     Text(
                         text = if (ratingCount > 0) {
                             String.format(
-                                java.util.Locale.US,
+                                Locale.US,
                                 "%.1f/5.0",
                                 songRating
                             )
@@ -530,7 +560,7 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
             }
         }
 
-        Spacer(modifier = Modifier.height(5.dp))
+        Spacer(Modifier.height(5.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -546,13 +576,13 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
             if (canEditDescription) {
                 TextButton(
                     onClick = {
-                        descriptionDraft = if (
-                            songDescription == "No description provided."
-                        ) {
-                            ""
-                        } else {
-                            songDescription
-                        }
+                        descriptionDraft =
+                            if (songDescription == "No description provided.") {
+                                ""
+                            } else {
+                                songDescription
+                            }
+
                         descriptionError = null
                         showDescriptionEditor = true
                     }
@@ -562,7 +592,7 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(Modifier.height(10.dp))
 
         Surface(
             shape = RoundedCornerShape(8.dp),
@@ -582,7 +612,7 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
             )
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(Modifier.height(20.dp))
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -612,7 +642,7 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                             .clip(RoundedCornerShape(8.dp))
                     )
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(Modifier.height(6.dp))
 
                     Text(
                         text = "Comments",
@@ -649,7 +679,7 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
                             .clip(RoundedCornerShape(8.dp))
                     )
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(Modifier.height(6.dp))
 
                     Text(
                         text = "Leaderboard",
@@ -668,7 +698,9 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "") {
 private data class SongComment(
     val id: String,
     val userId: String,
-    val text: String
+    val text: String,
+    val hidden: Boolean = false,
+    val likedBy: List<String> = emptyList()
 )
 
 private data class LeaderboardMap(
@@ -688,40 +720,106 @@ private fun SongFeaturePopup(
     onClose: () -> Unit
 ) {
     val db = remember { FirebaseFirestore.getInstance() }
+    val auth = remember { FirebaseAuth.getInstance() }
     val purple = Color(0xFF5D36EB)
 
-    var maps by remember(songId) {
+    var currentUid by remember {
+        mutableStateOf(auth.currentUser?.uid)
+    }
+    var songOwnerId by remember(songId, currentUid) {
+        mutableStateOf("")
+    }
+
+    var maps by remember(songId, currentUid) {
         mutableStateOf<List<LeaderboardMap>>(emptyList())
     }
-    var selectedMap by remember(songId) { mutableStateOf("") }
-
-    var comments by remember(songId) {
+    var selectedMap by remember(songId, currentUid) {
+        mutableStateOf("")
+    }
+    var comments by remember(songId, currentUid) {
         mutableStateOf<List<SongComment>>(emptyList())
     }
-    var scores by remember(songId) {
+    var scores by remember(songId, currentUid) {
         mutableStateOf<List<RankedScore>>(emptyList())
     }
-
-    val names = remember(songId) {
+    val names = remember(songId, currentUid) {
         mutableStateMapOf<String, String>()
     }
 
-    var error by remember(songId) { mutableStateOf<String?>(null) }
-    var mapError by remember(songId) { mutableStateOf<String?>(null) }
-    var loading by remember(songId) { mutableStateOf(false) }
-    var mapsLoading by remember(songId) { mutableStateOf(leaderboard) }
-    var draft by remember(songId) { mutableStateOf("") }
-    var sending by remember(songId) { mutableStateOf(false) }
-    var postError by remember(songId) {
+    var error by remember(songId, currentUid) {
+        mutableStateOf<String?>(null)
+    }
+    var mapError by remember(songId, currentUid) {
+        mutableStateOf<String?>(null)
+    }
+    var loading by remember(songId, currentUid) {
+        mutableStateOf(false)
+    }
+    var mapsLoading by remember(songId, currentUid) {
+        mutableStateOf(leaderboard)
+    }
+    var draft by remember(songId, currentUid) {
+        mutableStateOf("")
+    }
+    var sending by remember(songId, currentUid) {
+        mutableStateOf(false)
+    }
+    var postError by remember(songId, currentUid) {
         mutableStateOf<String?>(null)
     }
 
-    DisposableEffect(songId, leaderboard) {
+    DisposableEffect(auth) {
+        val listener = FirebaseAuth.AuthStateListener {
+            currentUid = it.currentUser?.uid
+        }
+
+        auth.addAuthStateListener(listener)
+
+        onDispose {
+            auth.removeAuthStateListener(listener)
+        }
+    }
+
+    DisposableEffect(songId, currentUid) {
         var active = true
-        mapsLoading = leaderboard && songId.isNotBlank()
+        songOwnerId = ""
+
+        val listener = if (songId.isNotBlank() && currentUid != null) {
+            db.collection("songs")
+                .document(songId)
+                .addSnapshotListener { document, exception ->
+                    if (active) {
+                        songOwnerId = if (exception == null) {
+                            document?.getString("ownerId").orEmpty()
+                        } else {
+                            ""
+                        }
+                    }
+                }
+        } else {
+            null
+        }
+
+        onDispose {
+            active = false
+            listener?.remove()
+        }
+    }
+
+    val isSongOwner =
+        currentUid != null && currentUid == songOwnerId
+
+    DisposableEffect(songId, leaderboard, currentUid) {
+        var active = true
+        maps = emptyList()
         mapError = null
 
-        val listener = if (leaderboard && songId.isNotBlank()) {
+        mapsLoading =
+            leaderboard && songId.isNotBlank() && currentUid != null
+
+        val listener = if (
+            leaderboard && songId.isNotBlank() && currentUid != null
+        ) {
             db.collection("beatmaps")
                 .whereEqualTo("songId", songId)
                 .addSnapshotListener { snapshot, exception ->
@@ -738,7 +836,8 @@ private fun SongFeaturePopup(
                             }
 
                             if (maps.none { it.id == selectedMap }) {
-                                selectedMap = maps.firstOrNull()?.id.orEmpty()
+                                selectedMap =
+                                    maps.firstOrNull()?.id.orEmpty()
                             }
                         }
                     }
@@ -753,7 +852,7 @@ private fun SongFeaturePopup(
         }
     }
 
-    DisposableEffect(songId, leaderboard, selectedMap) {
+    DisposableEffect(songId, leaderboard, selectedMap, currentUid) {
         var active = true
         comments = emptyList()
         scores = emptyList()
@@ -770,13 +869,14 @@ private fun SongFeaturePopup(
                 .addOnSuccessListener { user ->
                     if (active) {
                         names[uid] = user.getString("username")
-                            ?.takeIf { it.isNotBlank() } ?: "User"
+                            ?.takeIf { it.isNotBlank() }
+                            ?: "User"
                     }
                 }
         }
 
         val query: Query? = when {
-            songId.isBlank() -> null
+            songId.isBlank() || currentUid == null -> null
 
             !leaderboard -> db.collection("songs")
                 .document(songId)
@@ -812,19 +912,29 @@ private fun SongFeaturePopup(
                                 )
                             }
                         } else {
-                            comments = snapshot?.documents.orEmpty().map { doc ->
-                                val uid = doc.getString("userId").orEmpty()
-                                loadUsername(uid)
+                            comments =
+                                snapshot?.documents.orEmpty().map { doc ->
+                                    val uid =
+                                        doc.getString("userId").orEmpty()
 
-                                SongComment(
-                                    id = doc.id,
-                                    userId = uid,
-                                    text = doc.getString("text").orEmpty()
-                                )
-                            }
+                                    loadUsername(uid)
+
+                                    SongComment(
+                                        id = doc.id,
+                                        userId = uid,
+                                        text = doc.getString("text").orEmpty(),
+                                        hidden =
+                                            doc.getBoolean("hidden") ?: false,
+                                        likedBy =
+                                            (doc.get("likedBy") as? List<*>)
+                                                .orEmpty()
+                                                .filterIsInstance<String>()
+                                    )
+                                }
                         }
                     } catch (e: Exception) {
-                        error = e.localizedMessage ?: "Unable to load entries."
+                        error = e.localizedMessage
+                            ?: "Unable to load entries."
                     }
                 }
             }
@@ -834,6 +944,10 @@ private fun SongFeaturePopup(
             active = false
             listener?.remove()
         }
+    }
+
+    val visibleComments = comments.filter {
+        !it.hidden || isSongOwner
     }
 
     Dialog(onDismissRequest = onClose) {
@@ -869,10 +983,12 @@ private fun SongFeaturePopup(
 
                 if (songId.isBlank()) {
                     Text("Open a song through Search → More details.")
+                } else if (currentUid == null) {
+                    Text("Please log in to view this section.")
                 }
 
-                (mapError ?: error)?.let { message ->
-                    Text(message, color = Color.Red)
+                (mapError ?: error)?.let {
+                    Text(it, color = Color.Red)
                 }
 
                 LazyColumn(
@@ -903,9 +1019,10 @@ private fun SongFeaturePopup(
                     } else if (
                         error == null &&
                         mapError == null &&
-                        songId.isNotBlank()
+                        songId.isNotBlank() &&
+                        currentUid != null
                     ) {
-                        if (!leaderboard && comments.isEmpty()) {
+                        if (!leaderboard && visibleComments.isEmpty()) {
                             item {
                                 Text("No comments yet.")
                             }
@@ -938,57 +1055,55 @@ private fun SongFeaturePopup(
                                         color = purple,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    Text("#${index + 1} • ${entry.score} points")
+
+                                    Text(
+                                        "#${index + 1} • ${entry.score} points"
+                                    )
                                 }
                             }
                         }
                     } else {
-                        items(comments, key = { it.id }) { comment ->
-                            Surface(
-                                color = Color(0xFFE9E2FF),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(Modifier.padding(12.dp)) {
-                                    Text(
-                                        text = names[comment.userId] ?: "User",
-                                        color = purple,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(comment.text)
-                                }
-                            }
+                        items(
+                            visibleComments,
+                            key = { it.id }
+                        ) { comment ->
+                            ManagedCommentCard(
+                                songId = songId,
+                                comment = comment,
+                                username = names[comment.userId] ?: "User",
+                                currentUid = currentUid,
+                                isSongOwner = isSongOwner
+                            )
                         }
                     }
                 }
 
                 if (!leaderboard && songId.isNotBlank()) {
-                    postError?.let { message ->
-                        Text(message, color = Color.Red)
+                    postError?.let {
+                        Text(it, color = Color.Red)
                     }
 
                     OutlinedTextField(
                         value = draft,
-                        onValueChange = { value ->
-                            if (value.length <= 1000) {
-                                draft = value
-                            }
+                        onValueChange = {
+                            if (it.length <= 1000) draft = it
                         },
                         label = { Text("Write a comment") },
-                        enabled = !sending,
+                        enabled = !sending && currentUid != null,
                         maxLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     Button(
-                        enabled = draft.isNotBlank() && !sending,
+                        enabled = draft.isNotBlank() &&
+                                !sending &&
+                                currentUid != null,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = purple
                         ),
                         onClick = {
-                            val uid = FirebaseAuth.getInstance()
-                                .currentUser?.uid
+                            val uid = auth.currentUser?.uid
                             val message = draft.trim()
 
                             if (uid == null) {
@@ -1012,8 +1127,8 @@ private fun SongFeaturePopup(
                                         draft = ""
                                         sending = false
                                     }
-                                    .addOnFailureListener { exception ->
-                                        postError = exception.localizedMessage
+                                    .addOnFailureListener {
+                                        postError = it.localizedMessage
                                             ?: "Unable to post comment."
                                         sending = false
                                     }
@@ -1021,11 +1136,304 @@ private fun SongFeaturePopup(
                         }
                     ) {
                         Text(
-                            text = if (sending) "Posting…" else "Post comment"
+                            if (sending) "Posting…" else "Post comment"
                         )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ManagedCommentCard(
+    songId: String,
+    comment: SongComment,
+    username: String,
+    currentUid: String?,
+    isSongOwner: Boolean
+) {
+    val db = remember { FirebaseFirestore.getInstance() }
+    val purple = Color(0xFF5D36EB)
+
+    var menuOpen by remember(comment.id, currentUid) {
+        mutableStateOf(false)
+    }
+    var confirmDelete by remember(comment.id, currentUid) {
+        mutableStateOf(false)
+    }
+    var busy by remember(comment.id, currentUid) {
+        mutableStateOf(false)
+    }
+    var actionError by remember(comment.id, currentUid) {
+        mutableStateOf<String?>(null)
+    }
+
+    val isCommentAuthor =
+        currentUid != null && comment.userId == currentUid
+
+    val liked =
+        currentUid != null && currentUid in comment.likedBy
+
+    val commentRef = remember(songId, comment.id) {
+        db.collection("songs")
+            .document(songId)
+            .collection("comments")
+            .document(comment.id)
+    }
+
+    Surface(
+        color = if (comment.hidden) {
+            Color(0xFFF0ECF5)
+        } else {
+            Color(0xFFE9E2FF)
+        },
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(
+                horizontal = 12.dp,
+                vertical = 4.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = username,
+                    color = purple,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Like button: immediately LEFT of the three dots.
+                TextButton(
+                    enabled = currentUid != null &&
+                            !busy &&
+                            !comment.hidden,
+                    contentPadding = PaddingValues(horizontal = 4.dp),
+                    modifier = Modifier
+                        .height(32.dp)
+                        .defaultMinSize(minWidth = 1.dp)
+                        .semantics {
+                            contentDescription = if (liked) {
+                                "Unlike comment"
+                            } else {
+                                "Like comment"
+                            }
+                        },
+                    onClick = {
+                        val uid = currentUid
+
+                        if (uid != null) {
+                            busy = true
+                            actionError = null
+
+                            val change = if (liked) {
+                                FieldValue.arrayRemove(uid)
+                            } else {
+                                FieldValue.arrayUnion(uid)
+                            }
+
+                            commentRef.update("likedBy", change)
+                                .addOnSuccessListener {
+                                    busy = false
+                                }
+                                .addOnFailureListener {
+                                    busy = false
+                                    actionError = it.localizedMessage
+                                        ?: "Unable to update like."
+                                }
+                        }
+                    }
+                ) {
+                    Text(
+                        text = if (liked) "♥" else "♡",
+                        color = if (liked) {
+                            Color(0xFFE54878)
+                        } else {
+                            purple
+                        },
+                        fontSize = 20.sp
+                    )
+
+                    Spacer(Modifier.width(4.dp))
+
+                    Text(
+                        text = "${comment.likedBy.size}",
+                        color = purple,
+                        fontSize = 12.sp
+                    )
+                }
+
+                // Three-dot menu.
+                if (isCommentAuthor || isSongOwner) {
+                    Box {
+                        IconButton(
+                            enabled = !busy,
+                            onClick = { menuOpen = true },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .semantics {
+                                    contentDescription = "Comment options"
+                                }
+                        ) {
+                            Text(
+                                text = "⋮",
+                                color = purple,
+                                fontSize = 22.sp
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false }
+                        ) {
+                            if (isCommentAuthor) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = "Delete",
+                                            color = Color(0xFFB3261E)
+                                        )
+                                    },
+                                    onClick = {
+                                        menuOpen = false
+                                        actionError = null
+                                        confirmDelete = true
+                                    }
+                                )
+                            }
+
+                            if (isSongOwner) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = if (comment.hidden) {
+                                                "Unhide comment"
+                                            } else {
+                                                "Hide comment"
+                                            }
+                                        )
+                                    },
+                                    onClick = {
+                                        menuOpen = false
+                                        busy = true
+                                        actionError = null
+
+                                        commentRef.update(
+                                            "hidden",
+                                            !comment.hidden
+                                        )
+                                            .addOnSuccessListener {
+                                                busy = false
+                                            }
+                                            .addOnFailureListener {
+                                                busy = false
+                                                actionError =
+                                                    it.localizedMessage
+                                                        ?: "Unable to update comment."
+                                            }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (comment.hidden) {
+                Text(
+                    text = "Hidden from the comments list",
+                    color = Color.Gray,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+            }
+
+            Text(
+                text = comment.text,
+                modifier = Modifier.padding(bottom = 2.dp)
+            )
+
+            if (busy) {
+                Text(
+                    text = "Saving…",
+                    color = Color.Gray,
+                    fontSize = 12.sp
+                )
+            }
+
+            actionError?.let {
+                Text(
+                    text = it,
+                    color = Color(0xFFB3261E),
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+
+    if (confirmDelete && isCommentAuthor) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!busy) confirmDelete = false
+            },
+            title = {
+                Text("Delete comment?")
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("This permanently removes your comment.")
+
+                    actionError?.let {
+                        Text(
+                            text = it,
+                            color = Color(0xFFB3261E)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !busy,
+                    onClick = {
+                        busy = true
+                        actionError = null
+
+                        commentRef.delete()
+                            .addOnSuccessListener {
+                                busy = false
+                                confirmDelete = false
+                            }
+                            .addOnFailureListener {
+                                busy = false
+                                actionError = it.localizedMessage
+                                    ?: "Unable to delete comment."
+                            }
+                    }
+                ) {
+                    Text(
+                        text = if (busy) "Deleting…" else "Delete",
+                        color = Color(0xFFB3261E)
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !busy,
+                    onClick = { confirmDelete = false }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
