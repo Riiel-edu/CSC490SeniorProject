@@ -124,14 +124,11 @@ fun Nav(
             )
         }
 
-        composable(route = "SongScreen") {
-            SongScreen(songScreenVM)
-        }
-
         composable("SongScreen/{songId}") { entry ->
             SongScreen(
                 viewModel = songScreenVM,
-                songId = entry.arguments?.getString("songId").orEmpty()
+                songId = entry.arguments?.getString("songId").orEmpty(),
+                navController = navController
             )
         }
 

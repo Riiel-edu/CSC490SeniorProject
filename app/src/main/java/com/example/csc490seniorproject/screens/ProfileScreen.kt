@@ -74,7 +74,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import com.google.firebase.storage.FirebaseStorage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import com.google.firebase.firestore.SetOptions
+
 private enum class ProfileTab { SONGS, FRIENDS, CHATS }
 @Composable
 fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, username: String,profileID: String? = null) {
@@ -91,8 +95,17 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
         mutableStateOf<Uri?>(null)
     }
 
+    val availableMusicTags = listOf(
+        "Rock",
+        "Pop",
+        "Jazz",
+        "Hip-Hop",
+        "Country"
+    )
 
-
+    var selectedMusicTags by remember(username) {
+        mutableStateOf(setOf<String>())
+    }
 
     val auth = remember { FirebaseAuth.getInstance() }
     val db = remember { FirebaseFirestore.getInstance() }
@@ -141,6 +154,23 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                     }
             }
         }
+    }
+
+    LaunchedEffect(profileUid) {
+        val uid = profileUid ?: return@LaunchedEffect
+
+        db.collection("users")
+            .document(uid)
+            .get()
+            .addOnSuccessListener { document ->
+                val savedTags = document.get("musicTags") as? List<*>
+
+                selectedMusicTags = savedTags
+                    .orEmpty()
+                    .filterIsInstance<String>()
+                    .filter { it in availableMusicTags }
+                    .toSet()
+            }
     }
 
 
@@ -342,10 +372,96 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                             modifier = Modifier.fillMaxWidth()
                         )
                     } else {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = editableUsername,
+                                fontFamily = fredoka
+                            )
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                selectedMusicTags.take(3).forEach { tag ->
+                                    Surface(
+                                        color = ProfileCardPurple,
+                                        shape = RoundedCornerShape(16.dp)
+                                    ) {
+                                        Text(
+                                            text = tag,
+                                            fontFamily = fredoka,
+                                            color = Color.White,
+                                            fontSize = 11.sp,
+                                            modifier = Modifier.padding(
+                                                horizontal = 10.dp,
+                                                vertical = 5.dp
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (selectedMusicTags.size > 3) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    selectedMusicTags.drop(3).forEach { tag ->
+                                        Surface(
+                                            color = ProfileCardPurple,
+                                            shape = RoundedCornerShape(16.dp)
+                                        ) {
+                                            Text(
+                                                text = tag,
+                                                fontFamily = fredoka,
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                modifier = Modifier.padding(
+                                                    horizontal = 10.dp,
+                                                    vertical = 5.dp
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (isEditing) {
                         Text(
-                            text = editableUsername,
-                            fontFamily = fredoka
+                            text = "Music Preferences",
+                            fontFamily = fredoka,
+                            fontSize = 14.sp
                         )
+
+                        availableMusicTags.chunked(2).forEach { rowTags ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                rowTags.forEach { tag ->
+                                    FilterChip(
+                                        selected = tag in selectedMusicTags,
+                                        onClick = {
+                                            selectedMusicTags =
+                                                if (tag in selectedMusicTags) {
+                                                    selectedMusicTags - tag
+                                                } else {
+                                                    selectedMusicTags + tag
+                                                }
+                                        },
+                                        label = {
+                                            Text(tag, fontFamily = fredoka)
+                                        },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = ProfilePurple,
+                                            selectedLabelColor = Color.White,
+                                            containerColor = Color.White,
+                                            labelColor = Color.DarkGray))
+                                }
+                            }
+                        }
                     }
 
                     if (
@@ -358,10 +474,30 @@ fun ProfileScreen(viewModel: ProfileScreenVM, navController: NavController, user
                                 if (isEditing) {
                                     viewModel.profileUsername = editableUsername
                                     viewModel.aboutMe = aboutMe
-                                    viewModel.profilePictureUrl = profilePictureUri?.toString() ?: ""
+                                    viewModel.profilePictureUrl =
+                                        profilePictureUri?.toString() ?: ""
 
                                     profileUid?.let { uid ->
                                         viewModel.updateProfileDetails(uid)
+
+                                        db.collection("users")
+                                            .document(uid)
+                                            .set(
+                                                mapOf(
+                                                    "musicTags" to availableMusicTags.filter {
+                                                        it in selectedMusicTags
+                                                    }
+                                                ),
+                                                SetOptions.merge()
+                                            )
+                                            .addOnSuccessListener {
+                                                println("Music tags saved successfully")
+                                            }
+                                            .addOnFailureListener { exception ->
+                                                println(
+                                                    "Failed to save music tags: ${exception.message}"
+                                                )
+                                            }
                                     }
                                 } else {
                                     profileUid?.let { uid ->
