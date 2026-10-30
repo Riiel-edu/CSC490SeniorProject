@@ -38,7 +38,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.csc490seniorproject.data.UserSession
 import com.example.csc490seniorproject.data.getUserProfile
-import com.example.csc490seniorproject.data.getEmailForUsername
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
@@ -49,7 +48,7 @@ fun LoginScreen( onLoginSuccess: (String) -> Unit, onRegisterClick: () -> Unit) 
     val userSession = remember { UserSession(context) }
     val scope = rememberCoroutineScope()
 
-    var username by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
@@ -89,14 +88,14 @@ fun LoginScreen( onLoginSuccess: (String) -> Unit, onRegisterClick: () -> Unit) 
         Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
-            value = username,
+            value = email,
             onValueChange = {
-                username = it
+                email = it
                 errorMessage = ""
             },
-            label = { Text("Username") },
+            label = { Text("Email") },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp)
         )
@@ -165,36 +164,33 @@ fun LoginScreen( onLoginSuccess: (String) -> Unit, onRegisterClick: () -> Unit) 
 
         Button(
             onClick = {
-                if (username.isBlank() || password.isBlank()) {
-                    errorMessage = "Please enter your username and password."
+                if (email.isBlank() || password.isBlank()) {
+                    errorMessage = "Please enter your email and password."
                 } else {
-                    getEmailForUsername(
-                        username = username,
-                        onSuccess = { resolvedEmail ->
-                            FirebaseAuth.getInstance()
-                                .signInWithEmailAndPassword(resolvedEmail, password)
-                                .addOnSuccessListener { authResult ->
-                                    val uid = authResult.user!!.uid
-                                    getUserProfile(
-                                        uid = uid,
-                                        onSuccess = { profile ->
-                                            scope.launch {
-                                                userSession.saveSession(uid, profile.username)
-                                                onLoginSuccess(profile.username)
-                                            }
-                                        },
-                                        onFailure = { e ->
-                                            errorMessage = "Logged in, but couldn't load profile: ${e.localizedMessage}"
-                                        }
-                                    )
+                    // No more username -> email lookup — signs in directly, so
+                    // this no longer depends on usernames/{key} having an
+                    // email field, and works for every account regardless of
+                    // when it was created.
+                    FirebaseAuth.getInstance()
+                        .signInWithEmailAndPassword(email.trim(), password)
+                        .addOnSuccessListener { authResult ->
+                            val uid = authResult.user!!.uid
+                            getUserProfile(
+                                uid = uid,
+                                onSuccess = { profile ->
+                                    scope.launch {
+                                        userSession.saveSession(uid, profile.username)
+                                        onLoginSuccess(profile.username)
+                                    }
+                                },
+                                onFailure = { e ->
+                                    errorMessage = "Logged in, but couldn't load profile: ${e.localizedMessage}"
                                 }
-                                .addOnFailureListener { e ->
-                                    errorMessage = "Your username or password is incorrect."
-                                }
-                        },
-                        onNotFound = { errorMessage = "No account found with that username." },
-                        onFailure = { e -> errorMessage = e.localizedMessage ?: "Something went wrong. Please try again." }
-                    )
+                            )
+                        }
+                        .addOnFailureListener { e ->
+                            errorMessage = "Your email or password is incorrect."
+                        }
                 }
             },
             modifier = Modifier.fillMaxWidth().height(54.dp),
