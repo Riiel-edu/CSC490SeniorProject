@@ -200,7 +200,7 @@ fun MySongsScreen(navController: NavController, viewModel: MySongsVM = viewModel
                                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                                     Button(onClick = { navController.navigate("GameScreen/${currentItem.id}") },
                                         colors = buttonColors, modifier = Modifier.weight(1f)) {
-                                        Text("Listen \uD83D\uDD0A", fontFamily = fredoka, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("▶ Play", fontFamily = fredoka, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                     Button(onClick = { navController.navigate("EditorScreen/${currentItem.id}") },
                                         colors = buttonColors, modifier = Modifier.weight(1f)) {
@@ -211,11 +211,6 @@ fun MySongsScreen(navController: NavController, viewModel: MySongsVM = viewModel
                                     Button(onClick = { navController.navigate("BeatmapEditorScreen/${currentItem.id}") },
                                         colors = buttonColors, modifier = Modifier.weight(1f)) {
                                         Text("Edit Beatmap", fontFamily = fredoka, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
-                                    Button(onClick = { navController.navigate("GameScreen/${currentItem.id}") },
-                                        colors = buttonColors, modifier = Modifier.weight(1.6f)) {
-                                        Text("Test Game", fontFamily = fredoka, textAlign = TextAlign.Center,
-                                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
                                     }
                                 }
                             }
