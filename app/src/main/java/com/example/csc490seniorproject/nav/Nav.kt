@@ -1,46 +1,50 @@
 package com.example.csc490seniorproject.nav
 
-import android.annotation.SuppressLint
 import android.app.Application
-import androidx.activity.ComponentActivity
-import androidx.compose.runtime.Composable
+import android.util.Log
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.csc490seniorproject.screens.LandingScreen
-import com.example.csc490seniorproject.screens.ProfileScreen
-import com.example.csc490seniorproject.screens.SearchScreen
-import com.example.csc490seniorproject.screens.SongScreen
-import com.example.csc490seniorproject.viewmodels.LandingScreenVM
-import com.example.csc490seniorproject.viewmodels.SearchScreenVM
-import com.example.csc490seniorproject.screens.LoginScreen
-import com.example.csc490seniorproject.viewmodels.EditorScreenVM
-import com.example.csc490seniorproject.screens.RegisterScreen
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.navArgument
+import com.example.csc490seniorproject.data.SongRepository
+import com.example.csc490seniorproject.objects.Beatmap
 import com.example.csc490seniorproject.screens.BeatmapEditorScreen
 import com.example.csc490seniorproject.screens.EditorScreen
 import com.example.csc490seniorproject.screens.GameScreen
+import com.example.csc490seniorproject.screens.LandingScreen
+import com.example.csc490seniorproject.screens.LoginScreen
 import com.example.csc490seniorproject.screens.MySongsScreen
+import com.example.csc490seniorproject.screens.ProfileScreen
+import com.example.csc490seniorproject.screens.RegisterScreen
+import com.example.csc490seniorproject.screens.SearchScreen
 import com.example.csc490seniorproject.screens.SettingsScreen
+import com.example.csc490seniorproject.screens.SongScreen
 import com.example.csc490seniorproject.viewmodels.BeatmapEditorVM
+import com.example.csc490seniorproject.viewmodels.EditorScreenVM
 import com.example.csc490seniorproject.viewmodels.GameVM
-
+import com.example.csc490seniorproject.viewmodels.LandingScreenVM
 import com.example.csc490seniorproject.viewmodels.ProfileScreenVM
+import com.example.csc490seniorproject.viewmodels.SearchScreenVM
 import com.example.csc490seniorproject.viewmodels.SongScreenVM
-import com.example.csc490seniorproject.viewmodels.WorkspaceViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
-@SuppressLint("ContextCastToActivity")
 @Composable
 fun Nav(
     navController: NavHostController,
@@ -74,6 +78,7 @@ fun Nav(
                 }
         }
     }
+
     NavHost(
         navController = navController,
         startDestination =
@@ -116,6 +121,7 @@ fun Nav(
                 }
             )
         }
+
         composable(route = "LandingScreen") {
             LandingScreen(
                 viewModel = landingScreenVM,
@@ -133,7 +139,6 @@ fun Nav(
         }
 
         composable(route = "ProfileScreen") {
-
             ProfileScreen(
                 viewModel = profileScreenVM,
                 navController = navController,
@@ -141,7 +146,6 @@ fun Nav(
                 profileID = null
             )
         }
-
 
         composable(route = "ProfileScreen/{uid}/{username}") { backStackEntry ->
             val uid = backStackEntry.arguments?.getString("uid")
@@ -162,11 +166,9 @@ fun Nav(
             )
         }
 
+        // MySongsVM is created inside the screen with viewModel()
         composable(route = "MySongsScreen") {
-            MySongsScreen(
-                viewModel = searchScreenVM,
-                navController = navController
-            )
+            MySongsScreen(navController = navController)
         }
 
         composable(route = "SettingsScreen") {
@@ -189,11 +191,13 @@ fun Nav(
             )
         }
 
-        composable("EditorScreen") {
+        composable(
+            route = "EditorScreen/{songId}",
+            arguments = listOf(navArgument("songId") { type = NavType.StringType })
+        ) { entry ->
+            val songId = entry.arguments?.getString("songId") ?: return@composable
             val editorViewModel: EditorScreenVM = viewModel()
-            LaunchedEffect(Unit) {
-                editorViewModel.setOwnerId(FirebaseAuth.getInstance().currentUser?.uid ?: "")
-            }
+            LaunchedEffect(songId) { editorViewModel.openSong(songId) }
             EditorScreen(
                 viewModel = editorViewModel,
                 navController = navController,
@@ -201,18 +205,13 @@ fun Nav(
             )
         }
 
-        composable("BeatmapEditorScreen") {
+        composable(
+            route = "BeatmapEditorScreen/{songId}",
+            arguments = listOf(navArgument("songId") { type = NavType.StringType })
+        ) { entry ->
+            val songId = entry.arguments?.getString("songId") ?: return@composable
             val beatmapViewModel: BeatmapEditorVM = viewModel()
-            val workspaceViewModel: WorkspaceViewModel =
-                viewModel(LocalContext.current as ComponentActivity)
-            val currentSong by workspaceViewModel.currentSong.collectAsState()
-
-            LaunchedEffect(currentSong?.id) {
-                beatmapViewModel.startNewBeatmap(
-                    songId = currentSong?.id ?: "",
-                    ownerId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-                )
-            }
+            LaunchedEffect(songId) { beatmapViewModel.openBeatmap(songId) }
             BeatmapEditorScreen(
                 viewModel = beatmapViewModel,
                 navController = navController,
@@ -220,21 +219,38 @@ fun Nav(
             )
         }
 
-        composable("GameScreen") {
+        composable(
+            route = "GameScreen/{songId}",
+            arguments = listOf(navArgument("songId") { type = NavType.StringType })
+        ) { entry ->
+            val songId = entry.arguments?.getString("songId") ?: return@composable
             val gameViewModel: GameVM = viewModel()
-            val workspaceViewModel: WorkspaceViewModel =
-                viewModel(LocalContext.current as ComponentActivity)
-            val beatmap by workspaceViewModel.currentBeatmap.collectAsState()
 
-            beatmap?.let {
-                GameScreen(
+            val result by produceState<Result<Beatmap?>?>(initialValue = null, songId) {
+                value = try {
+                    Result.success(SongRepository.loadBeatmap(songId))
+                } catch (e: Exception) {
+                    Log.e("GameLoad", "failed for $songId", e)
+                    Result.failure(e)
+                }
+            }
+
+            val r = result
+            when {
+                r == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+                r.isFailure -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+                    Text("Couldn't load beatmap: ${r.exceptionOrNull()?.message}")
+                }
+                r.getOrNull() == null -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+                    Text("No beatmap found for this song. Open Edit Beatmap, add notes and save.")
+                }
+                else -> GameScreen(
                     viewModel = gameViewModel,
-                    beatmap = it,
-                    navController = navController, // the NavHost's own controller, already in scope here
+                    beatmap = r.getOrNull()!!,
+                    navController = navController,
                     modifier = Modifier
                 )
             }
         }
     }
-
 }

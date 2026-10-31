@@ -5,7 +5,8 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.csc490seniorproject.audio.HighQualityPlaybackEngine
-import com.example.csc490seniorproject.data.saveSong
+import com.example.csc490seniorproject.data.SongRepository
+import com.example.csc490seniorproject.objects.Beatmap
 import com.example.csc490seniorproject.objects.Instrument
 import com.example.csc490seniorproject.objects.Note
 import com.example.csc490seniorproject.objects.Song
@@ -238,26 +239,40 @@ class EditorScreenVM(application: Application) : AndroidViewModel(application) {
     private val _saveStatus = MutableStateFlow<String?>(null)
     val saveStatus = _saveStatus.asStateFlow()
 
+
+    fun openSong(songId: String) {
+        if (_song.value.id == songId) return   // already loaded, keep unsaved edits
+
+        viewModelScope.launch {
+            try {
+                val s = SongRepository.loadSong(songId)
+                if (s == null) { _saveStatus.value = "Song not found"; return@launch }
+                loadSong(s)
+                playbackEngine.preload(s)
+            } catch (e: Exception) {
+                Log.e("SongSave", "load failed", e)
+                _saveStatus.value = "Load failed: ${e.message}"
+            }
+        }
+    }
+
     fun saveCurrentSong() {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
-        Log.d("SongSave", "clicked, uid=$uid, songId=${song.value.id}")
         if (uid == null) { _saveStatus.value = "Not signed in"; return }
-        try {
-            saveSong(
-                uid = uid,
-                song = song.value,
-                onSuccess = { id ->
-                    Log.d("SongSave", "saved $id")
-                    _song.update { it.copy(id = id) }
-                    _saveStatus.value = "Saved"
-                },
-                onFailure = {
-                    Log.e("SongSave", "failed", it)
-                    _saveStatus.value = "Save failed: ${it.message}"
-                }
-            )
-        } catch (e: Exception) {
-            Log.e("SongSave", "threw before sending", e)
+
+        viewModelScope.launch {
+            _saveStatus.value = "Saving…"
+            try {
+                val s = _song.value.copy(ownerId = uid)
+                SongRepository.saveSong(s)
+
+                val saved = SongRepository.loadSong(s.id)
+                _song.update { it.copy(ownerId = uid, createdAt = saved?.createdAt, updatedAt = saved?.updatedAt) }
+                _saveStatus.value = "Saved"
+            } catch (e: Exception) {
+                Log.e("SongSave", "failed", e)
+                _saveStatus.value = "Save failed: ${e.message}"
+            }
         }
     }
 }

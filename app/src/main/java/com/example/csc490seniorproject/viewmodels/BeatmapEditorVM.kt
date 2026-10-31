@@ -1,15 +1,21 @@
 package com.example.csc490seniorproject.viewmodels
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.csc490seniorproject.data.SongRepository
 import com.example.csc490seniorproject.objects.BeatNote
 import com.example.csc490seniorproject.objects.BeatNoteType
 import com.example.csc490seniorproject.objects.Beatmap
 import com.example.csc490seniorproject.objects.newBeatmap
 import com.example.csc490seniorproject.objects.validColumnCount
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 class BeatmapEditorVM(application: Application) : AndroidViewModel(application) {
 
@@ -32,9 +38,48 @@ class BeatmapEditorVM(application: Application) : AndroidViewModel(application) 
         beatmapFlow.value = beatmap
     }
 
-    fun startNewBeatmap(songId: String, ownerId: String, columnCount: Int = 4, bpm: Int = 120, bars: Int = 64) {
-        undoStack.clear()
-        beatmapFlow.value = newBeatmap(songId, ownerId, columnCount, bpm, bars)
+    private val _saveStatus = MutableStateFlow<String?>(null)
+    val saveStatus: StateFlow<String?> = _saveStatus.asStateFlow()
+
+    fun openBeatmap(songId: String) {
+        // Already loaded for this song: keep any unsaved edits
+        if (beatmapFlow.value.songId == songId) return
+
+        viewModelScope.launch {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
+            try {
+                val loaded = SongRepository.loadBeatmap(songId)
+                    ?: newBeatmap(songId = songId, ownerId = uid)
+                loadBeatmap(loaded)   // sets the flow and clears undo
+            } catch (e: Exception) {
+                Log.e("BeatmapLoad", "failed", e)
+                _saveStatus.value = "Load failed: ${e.message}"
+            }
+        }
+    }
+
+    fun saveBeatmap() {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid == null) { _saveStatus.value = "Not signed in"; return }
+        val current = beatmapFlow.value
+        if (current.songId.isEmpty()) { _saveStatus.value = "No song loaded"; return }
+
+        viewModelScope.launch {
+            _saveStatus.value = "Saving…"
+            try {
+                SongRepository.saveBeatmap(current.songId, uid, current)
+
+                // Pull back the server timestamps without touching the notes
+                val saved = SongRepository.loadBeatmap(current.songId)
+                beatmapFlow.update {
+                    it.copy(ownerId = uid, createdAt = saved?.createdAt, updatedAt = saved?.updatedAt)
+                }
+                _saveStatus.value = "Saved"
+            } catch (e: Exception) {
+                Log.e("BeatmapSave", "failed", e)
+                _saveStatus.value = "Save failed: ${e.message}"
+            }
+        }
     }
 
     fun renameBeatmap(title: String) = mutate { it.copy(title = title) }

@@ -1,63 +1,67 @@
 package com.example.csc490seniorproject.data
 
+import com.example.csc490seniorproject.objects.Beatmap
 import com.example.csc490seniorproject.objects.Song
+import com.google.firebase.Firebase
 import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.firestore
+import com.google.firebase.firestore.toObject
+import com.google.firebase.firestore.toObjects
+import kotlinx.coroutines.tasks.await
 
-fun saveSong(uid: String, song: Song, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {
-    val songs = FirebaseFirestore.getInstance().collection("songs")
-    val doc = if (song.id.isBlank()) songs.document() else songs.document(song.id)
-    doc.set(song.copy(id = doc.id, ownerId = uid))
-        .addOnSuccessListener { onSuccess(doc.id) }
-        .addOnFailureListener { onFailure(it) }
-}
+object SongRepository {
+    private val db = Firebase.firestore
+    private val songs = db.collection("songs")
+    private val beatmaps = db.collection("beatmaps")
 
-fun loadSong(songId: String, onSuccess: (Song?) -> Unit, onFailure: (Exception) -> Unit) {
-    FirebaseFirestore.getInstance()
-        .collection("songs").document(songId)
-        .get()
-        .addOnSuccessListener { onSuccess(it.toObject(Song::class.java)) }
-        .addOnFailureListener { onFailure(it) }
-}
+    // ---------- Songs ----------
 
-fun loadMySongs(uid: String, onSuccess: (List<Song>) -> Unit, onFailure: (Exception) -> Unit) {
-    FirebaseFirestore.getInstance()
-        .collection("songs")
-        .whereEqualTo("ownerUid", uid)
-        .get()
-        .addOnSuccessListener { onSuccess(it.toObjects(Song::class.java)) }
-        .addOnFailureListener { onFailure(it) }
-}
+    suspend fun saveSong(song: Song) {
+        songs.document(song.id).set(song.copy(updatedAt = null)).await()
+    }
 
-fun loadSongsSharedWithMe(uid: String, onSuccess: (List<Song>) -> Unit, onFailure: (Exception) -> Unit) {
-    FirebaseFirestore.getInstance()
-        .collection("songs")
-        .whereArrayContains("sharedWith", uid)
-        .get()
-        .addOnSuccessListener { onSuccess(it.toObjects(Song::class.java)) }
-        .addOnFailureListener { onFailure(it) }
-}
+    suspend fun loadSong(id: String): Song? =
+        songs.document(id).get().await().toObject<Song>()
 
-fun shareSong(songId: String, friendUid: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-    FirebaseFirestore.getInstance()
-        .collection("songs").document(songId)
-        .update("sharedWith", FieldValue.arrayUnion(friendUid))
-        .addOnSuccessListener { onSuccess() }
-        .addOnFailureListener { onFailure(it) }
-}
+    suspend fun mySongs(uid: String): List<Song> =
+        songs.whereEqualTo("ownerId", uid).get().await().toObjects<Song>()
 
-fun unshareSong(songId: String, friendUid: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-    FirebaseFirestore.getInstance()
-        .collection("songs").document(songId)
-        .update("sharedWith", FieldValue.arrayRemove(friendUid))
-        .addOnSuccessListener { onSuccess() }
-        .addOnFailureListener { onFailure(it) }
-}
+    // Deletes the song and its beatmap atomically (no query needed now)
+    suspend fun deleteSong(songId: String) {
+        db.runBatch { batch ->
+            batch.delete(beatmaps.document(songId))
+            batch.delete(songs.document(songId))
+        }.await()
+    }
 
-fun deleteSong(songId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-    FirebaseFirestore.getInstance()
-        .collection("songs").document(songId)
-        .delete()
-        .addOnSuccessListener { onSuccess() }
-        .addOnFailureListener { onFailure(it) }
+    // ---------- Beatmap (document ID = song ID) ----------
+
+    suspend fun saveBeatmap(songId: String, ownerId: String, map: Beatmap) {
+        beatmaps.document(songId)
+            .set(map.copy(songId = songId, ownerId = ownerId, updatedAt = null))
+            .await()
+    }
+
+    suspend fun loadBeatmap(songId: String): Beatmap? =
+        beatmaps.document(songId).get().await().toObject<Beatmap>()
+
+    // ---------- Both together ----------
+
+    // Song first, because the beatmap rule looks up the parent song
+    suspend fun saveAll(song: Song, beatmap: Beatmap) {
+        saveSong(song)
+        saveBeatmap(song.id, song.ownerId, beatmap)
+    }
+
+    suspend fun updateSongDetails(id: String, name: String, genre: List<String>) {
+        songs.document(id).update(
+            mapOf("name" to name, "genre" to genre, "updatedAt" to FieldValue.serverTimestamp())
+        ).await()
+    }
+
+    suspend fun setPublished(id: String, published: Boolean) {
+        songs.document(id).update(
+            mapOf("published" to published, "updatedAt" to FieldValue.serverTimestamp())
+        ).await()
+    }
 }
