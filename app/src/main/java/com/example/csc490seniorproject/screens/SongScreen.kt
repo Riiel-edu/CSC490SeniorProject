@@ -698,72 +698,6 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "", navController: NavC
                     fontSize = 24.sp
                 )
 
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    if (canEditSongTags) {
-                        TextButton(
-                            onClick = {
-                                selectedSongTags = songTags.toSet()
-                                songTagError = null
-                                showSongTagEditor = true
-                            },
-                            contentPadding = PaddingValues(
-                                horizontal = 4.dp,
-                                vertical = 0.dp
-                            )
-                        ) {
-                            Text(
-                                text = "Edit",
-                                fontSize = 12.sp,
-                                color = purple
-                            )
-                        }
-                    }
-                }
-
-                if (songTags.isEmpty()) {
-                    Text(
-                        text = "No song tags yet",
-                        fontFamily = fredoka,
-                        fontSize = 11.sp,
-                        color = Color.Gray
-                    )
-                } else {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        songTags.chunked(3).forEach { rowTags ->
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                rowTags.forEach { tag ->
-                                    Surface(
-                                        color = purple,
-                                        shape = RoundedCornerShape(16.dp)
-                                    ) {
-                                        Text(
-                                            text = tag,
-                                            fontFamily = fredoka,
-                                            color = Color.White,
-                                            fontSize = 10.sp,
-                                            maxLines = 1,
-                                            modifier = Modifier.padding(
-                                                horizontal = 8.dp,
-                                                vertical = 4.dp
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
@@ -812,33 +746,121 @@ fun SongScreen(viewModel: SongScreenVM, songId: String = "", navController: NavC
                     )
                 }
 
-                Button(
-                    onClick = {
-                        if (currentUid == null) {
-                            ratingError = "Please log in to rate this song."
-                        } else {
-                            selectedRating = myRating
-                            ratingError = null
-                            showRatingDialog = true
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = purple
-                    ),
-                    contentPadding = PaddingValues(
-                        horizontal = 16.dp,
-                        vertical = 4.dp
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = if (myRating > 0) "Change rating" else "Rate",
-                        fontSize = 12.sp
-                    )
+                    if (songTags.isEmpty()) {
+                        Text(
+                            text = "No song tags yet",
+                            fontFamily = fredoka,
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    } else {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            songTags.chunked(3).forEach { rowTags ->
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    rowTags.forEach { tag ->
+                                        Surface(
+                                            color = purple,
+                                            shape = RoundedCornerShape(16.dp)
+                                        ) {
+                                            Text(
+                                                text = tag,
+                                                fontFamily = fredoka,
+                                                color = Color.White,
+                                                fontSize = 10.sp,
+                                                maxLines = 1,
+                                                modifier = Modifier.padding(
+                                                    horizontal = 8.dp,
+                                                    vertical = 4.dp
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (canEditSongTags) {
+                        TextButton(
+                            onClick = {
+                                selectedSongTags = songTags.toSet()
+                                songTagError = null
+                                showSongTagEditor = true
+                            },
+                            contentPadding = PaddingValues(
+                                horizontal = 4.dp,
+                                vertical = 0.dp
+                            )
+                        ) {
+                            Text(
+                                text = "Edit",
+                                fontSize = 12.sp,
+                                color = purple
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        Spacer(Modifier.height(5.dp))
+        Spacer(Modifier.height(20.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = {
+                    if (songId.isNotBlank() && songLoadError == null) {
+                        navController.navigate("GameScreen/${Uri.encode(songId)}")
+                    }
+                },
+                enabled = songId.isNotBlank() && songLoadError == null,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = purple
+                ),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "▶ Play",
+                    fontFamily = fredoka,
+                    color = Color.White,
+                    fontSize = 16.sp
+                )
+            }
+
+            Button(
+                onClick = {
+                    if (currentUid == null) {
+                        ratingError = "Please log in to rate this song."
+                    } else {
+                        selectedRating = myRating
+                        ratingError = null
+                        showRatingDialog = true
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = purple
+                ),
+                contentPadding = PaddingValues(
+                    horizontal = 16.dp,
+                    vertical = 4.dp
+                ),modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = if (myRating > 0) "★ Change rating" else "★ Rate",
+                    fontFamily = fredoka,
+                    color = Color.White,
+                    fontSize = 16.sp
+                )
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1106,7 +1128,9 @@ private data class LeaderboardMap(
 
 private data class RankedScore(
     val userId: String,
-    val score: Long
+    val username: String,
+    val score: Long,
+    val stars: Int
 )
 
 @Composable
@@ -1300,11 +1324,13 @@ private fun SongFeaturePopup(
                     try {
                         if (leaderboard) {
                             scores = snapshot?.documents.orEmpty().map { doc ->
-                                loadUsername(doc.id)
-
                                 RankedScore(
                                     userId = doc.id,
-                                    score = doc.getLong("score") ?: 0L
+                                    username = doc.getString("username")
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?: "User",
+                                    score = doc.getLong("score") ?: 0L,
+                                    stars = (doc.getLong("stars") ?: 0L).toInt().coerceIn(0, 5)
                                 )
                             }
                         } else {
@@ -1439,21 +1465,54 @@ private fun SongFeaturePopup(
                             key = { index -> scores[index].userId }
                         ) { index ->
                             val entry = scores[index]
+                            val isMe = entry.userId == currentUid
+
+                            val rankColor = when (index) {
+                                0 -> Color(0xFFFFB300)   // gold
+                                1 -> Color(0xFF9E9E9E)   // silver
+                                2 -> Color(0xFFB87333)   // bronze
+                                else -> Color.White
+                            }
 
                             Surface(
-                                color = Color(0xFFE9E2FF),
+                                color = if (isMe) Color(0xFFD6C8FF) else Color(0xFFE9E2FF),
                                 shape = RoundedCornerShape(12.dp),
+                                border = if (isMe) BorderStroke(2.dp, purple) else null,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
                                     Text(
-                                        text = names[entry.userId] ?: "User",
-                                        color = purple,
-                                        fontWeight = FontWeight.Bold
+                                        text = "#${index + 1}",
+                                        color = rankColor,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 18.sp,
+                                        modifier = Modifier.widthIn(min = 36.dp)
                                     )
 
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = entry.username,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "★".repeat(entry.stars) + "☆".repeat(5 - entry.stars),
+                                            color = purple,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+
                                     Text(
-                                        "#${index + 1} • ${entry.score} points"
+                                        text = "${entry.score}",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
                                     )
                                 }
                             }

@@ -9,6 +9,9 @@ import com.example.csc490seniorproject.objects.BeatNoteType
 import com.example.csc490seniorproject.objects.endStep
 import com.example.csc490seniorproject.objects.stepDurationMs
 import com.example.csc490seniorproject.objects.totalSteps
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -225,6 +228,7 @@ class GameVM(application: Application) : AndroidViewModel(application) {
 
                     if (now - completionStartedAt >= END_DELAY_MS) {
                         _isGameOver.value = true
+                        saveScoreIfBetter()   // <-- add
                         break
                     }
                 } else {
@@ -363,6 +367,49 @@ class GameVM(application: Application) : AndroidViewModel(application) {
         _lastJudgment.value = judgment
 
         return multiplier
+    }
+
+    private fun saveScoreIfBetter() {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val beatmapId = beatmap.id
+        if (beatmapId.isBlank()) return
+
+        val finalScore = _score.value
+        val percent = if (maxPossibleScore > 0)
+            (finalScore.toDouble() / maxPossibleScore) * 100.0 else 0.0
+        val stars = starsForPercent(percent).starsFilled
+
+        val db = FirebaseFirestore.getInstance()
+        val scoreRef = db.collection("beatmaps").document(beatmapId)
+            .collection("scores").document(uid)
+        val userRef = db.collection("users").document(uid)
+
+        userRef.get().addOnSuccessListener { userDoc ->
+            val username = userDoc.getString("username") ?: return@addOnSuccessListener
+
+            // Transaction so we never overwrite a better score, even if two writes race.
+            db.runTransaction { tx ->
+                val existing = tx.get(scoreRef)
+                val oldScore = existing.getLong("score")
+
+                if (oldScore == null || finalScore > oldScore) {
+                    tx.set(
+                        scoreRef,
+                        mapOf(
+                            "username" to username,
+                            "score" to finalScore,
+                            "stars" to stars,
+                            "updatedAt" to FieldValue.serverTimestamp()
+                        )
+                    )
+                }
+                null
+            }.addOnFailureListener { e ->
+                android.util.Log.e("GameVM", "Failed to save score", e)
+            }
+        }.addOnFailureListener { e ->
+            android.util.Log.e("GameVM", "Failed to load username", e)
+        }
     }
 
     companion object {

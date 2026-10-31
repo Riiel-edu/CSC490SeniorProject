@@ -536,14 +536,17 @@ fun SearchScreen(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                // Playback is not connected yet.
-                                OutlinedButton(
-                                    onClick = {},
-                                    enabled = false,
+                                Button(
+                                    onClick = {
+                                        navController.navigate("GameScreen/${song.id}")
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = purple
+                                    ),
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Text(
-                                        "Listen 🔊",
+                                        "▶ Play",
                                         fontFamily = fredoka,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
